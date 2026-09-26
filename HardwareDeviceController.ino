@@ -48,12 +48,15 @@ void setup()
     Serial.println("READY");
     printCommandHelp();
     printFloatStatus();
+    handleSerialCommand("quiet");
+    handleSerialCommand("test");
 }
 
 void loop()
 {
     pollFloatInputs();
     readSerialCommands();
+    pollSsrTest();
     edgeNetwork.loop();
 
     const unsigned long now = millis();
