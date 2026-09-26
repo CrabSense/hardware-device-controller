@@ -126,7 +126,9 @@ background:#07866d;color:white;font-size:16px;font-weight:bold}small{color:#607d
 <label>Wi-Fi trại</label>
 <input name="ssid" required placeholder="Tên Wi-Fi">
 <label>Mật khẩu Wi-Fi</label>
-<input name="password" type="password" placeholder="Mật khẩu">
+<input id="password" name="password" type="password" placeholder="Mật khẩu">
+<label style="font-weight:normal"><input id="showPassword" type="checkbox"
+onchange="password.type=this.checked?'text':'password'"> Hiện mật khẩu</label>
 <label>Kiosk URL</label>
 <input name="kioskUrl" required value="http://192.168.1.95:8090">
 <small>Ví dụ: http://192.168.1.95:8090</small>
