@@ -5,6 +5,7 @@
 #include "../drivers/FloatController.h"
 
 #include <ArduinoJson.h>
+#include <DNSServer.h>
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WebServer.h>
@@ -13,6 +14,7 @@
 namespace
 {
 Preferences preferences;
+DNSServer dnsServer;
 WebServer server(PROVISION_HTTP_PORT);
 EdgeNetwork *instance = nullptr;
 }
@@ -29,6 +31,14 @@ void EdgeNetwork::begin()
     server.on("/generate_204", HTTP_GET, []() { instance->handleProvisionPage(); });
     server.on("/hotspot-detect.html", HTTP_GET,
               []() { instance->handleProvisionPage(); });
+    server.on("/connecttest.txt", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
+    server.on("/ncsi.txt", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
+    server.on("/success.txt", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
+    server.on("/fwlink", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
     server.on("/api/info", HTTP_GET, []() { instance->handleInfo(); });
     server.on("/api/provision", HTTP_OPTIONS, []() { server.send(204); });
     server.on("/api/provision", HTTP_POST, []() { instance->handleProvision(); });
@@ -43,6 +53,8 @@ void EdgeNetwork::begin()
 
 void EdgeNetwork::loop()
 {
+    if (provisioningMode)
+        dnsServer.processNextRequest();
     server.handleClient();
 
     if (restartPending && millis() >= restartAt)
@@ -98,6 +110,7 @@ void EdgeNetwork::startProvisioningAp()
     provisioningMode = true;
     WiFi.mode(WIFI_AP);
     WiFi.softAP(apName().c_str());
+    dnsServer.start(53, "*", WiFi.softAPIP());
     Serial.print("Provisioning AP: ");
     Serial.println(apName());
     Serial.println("POST /api/provision with ssid, password, kioskUrl");
