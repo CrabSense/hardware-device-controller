@@ -1,6 +1,7 @@
 # CrabSense Hardware Device Controller
 
-Firmware skeleton for one standalone ESP32-S3 device controller.
+Firmware skeleton for one standalone ESP32 DevKit V1 (ESP32-WROOM-32)
+device controller.
 
 ## Structure
 
@@ -26,7 +27,7 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
 ## Current scaffold
 
 - PlatformIO + Arduino framework
-- ESP32-S3 DevKitC-1 target
+- ESP32 DevKit V1 (`esp32dev`) target
 - Four safe-by-default digital outputs
 - Four debounced float/reed inputs:
   - `tank_01_low`
@@ -35,6 +36,19 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
   - `tank_02_high`
 - Serial command interface at `115200` baud
 - Emergency-safe startup state: all outputs are disabled
+
+Pin mapping for the current ESP32 DevKit V1:
+
+```text
+Float T1 LOW   GPIO13
+Float T1 HIGH  GPIO14
+Float T2 LOW   GPIO16
+Float T2 HIGH  GPIO17
+Output 1       GPIO4
+Output 2       GPIO5
+Output 3       GPIO18
+Output 4       GPIO19
+```
 
 Commands:
 
