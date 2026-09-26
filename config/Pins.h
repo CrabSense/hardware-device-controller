@@ -5,8 +5,8 @@
 #define PIN_STATUS_LED 2
 
 // SSR channels. These pins drive only the low-voltage SSR inputs.
-#define PIN_OUTPUT_1 27
-#define PIN_OUTPUT_2 4
+#define PIN_OUTPUT_1 4
+#define PIN_OUTPUT_2 26
 
 // Float/reed inputs. Keep the original float wiring.
 #define PIN_FLOAT_1 13

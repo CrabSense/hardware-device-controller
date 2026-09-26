@@ -45,8 +45,8 @@ Float 1        GPIO13
 Float 2        GPIO14
 Float 3        GPIO16
 Float 4        GPIO17
-SSR 1 input    GPIO27
-SSR 2 input    GPIO4
+SSR 1 input    GPIO4
+SSR 2 input    GPIO26
 ```
 
 Commands:
