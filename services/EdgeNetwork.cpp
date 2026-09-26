@@ -39,6 +39,14 @@ void EdgeNetwork::begin()
               []() { instance->handleProvisionPage(); });
     server.on("/fwlink", HTTP_GET,
               []() { instance->handleProvisionPage(); });
+    server.on("/redirect", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
+    server.onNotFound([]() {
+        if (instance->provisioningMode)
+            instance->handleProvisionPage();
+        else
+            server.send(404, "text/plain", "Not found");
+    });
     server.on("/api/info", HTTP_GET, []() { instance->handleInfo(); });
     server.on("/api/provision", HTTP_OPTIONS, []() { server.send(204); });
     server.on("/api/provision", HTTP_POST, []() { instance->handleProvision(); });
