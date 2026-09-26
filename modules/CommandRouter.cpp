@@ -5,6 +5,8 @@
 
 namespace
 {
+bool floatLogEnabled = true;
+
 void reportOutputs()
 {
     Serial.print("OUTPUTS:");
@@ -28,7 +30,9 @@ void printCommandHelp()
     Serial.println("  off <1-2>      Disable SSR");
     Serial.println("  alloff         Disable every output");
     Serial.println("  status         Show output states");
-    Serial.println("  floats         Print all float states as JSON");
+    Serial.println("  floats         Print all float states");
+    Serial.println("  quiet          Stop repeating float log");
+    Serial.println("  log            Resume repeating float log");
     Serial.println("  help            Show this help");
     Serial.println();
 }
@@ -60,18 +64,49 @@ void handleSerialCommand(const String &command)
         return;
     }
 
+    if (command.equalsIgnoreCase("quiet"))
+    {
+        floatLogEnabled = false;
+        Serial.println("OK float log OFF");
+        return;
+    }
+
+    if (command.equalsIgnoreCase("log"))
+    {
+        floatLogEnabled = true;
+        Serial.println("OK float log ON");
+        return;
+    }
+
     int channel = 0;
     if (sscanf(command.c_str(), "on %d", &channel) == 1)
     {
-        Serial.println(setOutput(channel, true) ? "OK output ON" : "ERR invalid channel");
+        if (!setOutput(channel, true))
+        {
+            Serial.println("ERR invalid channel");
+            return;
+        }
+        Serial.println("OK output ON");
+        reportOutputs();
         return;
     }
 
     if (sscanf(command.c_str(), "off %d", &channel) == 1)
     {
-        Serial.println(setOutput(channel, false) ? "OK output OFF" : "ERR invalid channel");
+        if (!setOutput(channel, false))
+        {
+            Serial.println("ERR invalid channel");
+            return;
+        }
+        Serial.println("OK output OFF");
+        reportOutputs();
         return;
     }
 
     Serial.println("ERR unknown command");
+}
+
+bool isFloatLogEnabled()
+{
+    return floatLogEnabled;
 }

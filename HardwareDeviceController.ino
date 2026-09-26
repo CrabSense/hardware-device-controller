@@ -57,7 +57,7 @@ void loop()
     edgeNetwork.loop();
 
     const unsigned long now = millis();
-    if (now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)
+    if (isFloatLogEnabled() && now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)
     {
         lastFloatLogAt = now;
         Serial.println("----");
