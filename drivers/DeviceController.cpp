@@ -12,6 +12,12 @@ constexpr uint8_t outputCount = sizeof(outputPins) / sizeof(outputPins[0]);
 
 bool outputState[outputCount] = {};
 
+void updateStatusLed()
+{
+    const bool anyOn = outputState[0] || (outputCount > 1 && outputState[1]);
+    digitalWrite(PIN_STATUS_LED, anyOn ? HIGH : LOW);
+}
+
 bool validChannel(uint8_t channel)
 {
     return channel >= 1 && channel <= outputCount;
@@ -38,6 +44,7 @@ void allOutputsOff()
         digitalWrite(outputPins[channel - 1], OUTPUT_INACTIVE_LEVEL);
         outputState[channel - 1] = false;
     }
+    updateStatusLed();
 }
 
 bool setOutput(uint8_t channel, bool enabled)
@@ -50,6 +57,7 @@ bool setOutput(uint8_t channel, bool enabled)
     digitalWrite(outputPins[channel - 1],
                  enabled ? OUTPUT_ACTIVE_LEVEL : OUTPUT_INACTIVE_LEVEL);
     outputState[channel - 1] = enabled;
+    updateStatusLed();
     return true;
 }
 
