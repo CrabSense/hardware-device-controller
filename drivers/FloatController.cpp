@@ -83,3 +83,23 @@ void printFloatStatus()
         Serial.println(input.stableState ? "ON" : "OFF");
     }
 }
+
+uint8_t getFloatCount()
+{
+    return static_cast<uint8_t>(inputCount);
+}
+
+uint8_t getFloatPin(uint8_t index)
+{
+    return index < inputCount ? inputs[index].pin : 0;
+}
+
+const char *getFloatSensorCode(uint8_t index)
+{
+    return index < inputCount ? inputs[index].sensorCode : "";
+}
+
+bool getFloatState(uint8_t index)
+{
+    return index < inputCount && inputs[index].stableState;
+}

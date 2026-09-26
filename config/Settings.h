@@ -12,5 +12,9 @@
 
 // Reed switch closed to GND is treated as an active float signal.
 #define FLOAT_ACTIVE_LEVEL LOW
+#define WIFI_CONNECT_TIMEOUT_MS 15000
+#define TELEMETRY_INTERVAL_MS 5000
+#define PROVISION_HTTP_PORT 80
+#define DEFAULT_KIOSK_URL "http://192.168.1.10:8090"
 
 #endif

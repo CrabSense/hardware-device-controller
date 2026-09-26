@@ -4,6 +4,9 @@
 #include "drivers/DeviceController.h"
 #include "drivers/FloatController.h"
 #include "modules/CommandRouter.h"
+#include "services/EdgeNetwork.h"
+
+EdgeNetwork edgeNetwork;
 
 namespace
 {
@@ -41,6 +44,7 @@ void setup()
 
     setupDeviceController();
     setupFloatController();
+    edgeNetwork.begin();
     Serial.println("READY");
     printCommandHelp();
     printFloatStatus();
@@ -50,6 +54,7 @@ void loop()
 {
     pollFloatInputs();
     readSerialCommands();
+    edgeNetwork.loop();
 
     const unsigned long now = millis();
     if (now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)

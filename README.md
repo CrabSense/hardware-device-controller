@@ -35,6 +35,7 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
   - `float_3`
   - `float_4`
 - Serial command interface at `115200` baud
+- Wi-Fi telemetry to the local Kiosk and HTTP command endpoint
 - Emergency-safe startup state: all outputs are disabled
 
 Pin mapping for the current ESP32 DevKit V1:
@@ -73,6 +74,24 @@ When a float state changes, the firmware prints a BE-ready event:
 
 `true` means the contact is closed/active. Whether that means "low", "high",
 "empty", or "full" is assigned later by BE/FE, outside the ESP firmware.
+
+## Kiosk provisioning
+
+On first boot, connect to the ESP access point `CrabSense-XXXX` and send:
+
+```json
+{
+  "ssid": "farm-wifi",
+  "password": "wifi-password",
+  "kioskUrl": "http://192.168.1.50:8090"
+}
+```
+
+to `POST http://192.168.4.1/api/provision`.
+
+After joining Wi-Fi, the ESP posts float telemetry to
+`POST <kioskUrl>/api/telemetry` and accepts Kiosk commands at
+`POST http://<esp-ip>/api/command`.
 
 ## Build and upload
 
