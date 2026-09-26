@@ -1,6 +1,7 @@
 #include "CommandRouter.h"
 
 #include "../drivers/DeviceController.h"
+#include "../drivers/FloatController.h"
 
 namespace
 {
@@ -27,6 +28,7 @@ void printCommandHelp()
     Serial.println("  off <1-4>      Disable output");
     Serial.println("  alloff         Disable every output");
     Serial.println("  status         Show output states");
+    Serial.println("  floats         Print all float states as JSON");
     Serial.println("  help            Show this help");
     Serial.println();
 }
@@ -49,6 +51,12 @@ void handleSerialCommand(const String &command)
     if (command.equalsIgnoreCase("status"))
     {
         reportOutputs();
+        return;
+    }
+
+    if (command.equalsIgnoreCase("floats"))
+    {
+        printFloatStatus();
         return;
     }
 

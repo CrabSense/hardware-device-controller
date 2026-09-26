@@ -2,6 +2,7 @@
 
 #include "config/Settings.h"
 #include "drivers/DeviceController.h"
+#include "drivers/FloatController.h"
 #include "modules/CommandRouter.h"
 
 namespace
@@ -38,11 +39,14 @@ void setup()
     delay(500);
 
     setupDeviceController();
+    setupFloatController();
     Serial.println("READY");
     printCommandHelp();
+    printFloatStatus();
 }
 
 void loop()
 {
+    pollFloatInputs();
     readSerialCommands();
 }
