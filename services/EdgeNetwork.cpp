@@ -53,6 +53,8 @@ void EdgeNetwork::begin()
     server.on("/configure", HTTP_POST,
               []() { instance->handleProvisionForm(); });
     server.on("/api/command", HTTP_POST, []() { instance->handleCommand(); });
+    server.on("/api/restart", HTTP_POST, []() { instance->handleRestart(); });
+    server.on("/api/reboot", HTTP_POST, []() { instance->handleRestart(); });
     server.on("/api/status", HTTP_GET, []() { instance->handleInfo(); });
 
     connectWifi();
@@ -204,6 +206,14 @@ void EdgeNetwork::handleInfo()
     String body;
     serializeJson(doc, body);
     server.send(200, "application/json", body);
+}
+
+void EdgeNetwork::handleRestart()
+{
+    server.send(200, "application/json",
+                "{\"success\":true,\"message\":\"Restart scheduled\"}");
+    restartPending = true;
+    restartAt = millis() + 500;
 }
 
 void EdgeNetwork::handleProvision()

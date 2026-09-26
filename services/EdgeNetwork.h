@@ -15,6 +15,7 @@ private:
     void handleProvisionPage();
     void handleProvisionForm();
     void handleInfo();
+    void handleRestart();
     void handleProvision();
     void handleCommand();
     void publishTelemetry();
