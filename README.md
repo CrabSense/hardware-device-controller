@@ -28,7 +28,7 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
 
 - PlatformIO + Arduino framework
 - ESP32 DevKit V1 (`esp32dev`) target
-- Four safe-by-default digital outputs
+- Two SSR-40DA digital outputs (active-high, safe OFF at boot)
 - Four debounced float/reed inputs:
   - `float_1`
   - `float_2`
@@ -36,19 +36,17 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
   - `float_4`
 - Serial command interface at `115200` baud
 - Wi-Fi telemetry to the local Kiosk and HTTP command endpoint
-- Emergency-safe startup state: all outputs are disabled
+- Emergency-safe startup state: both SSR outputs are disabled
 
 Pin mapping for the current ESP32 DevKit V1:
 
 ```text
-Float 1        GPIO13
-Float 2        GPIO14
-Float 3        GPIO16
-Float 4        GPIO17
-Output 1       GPIO4
-Output 2       GPIO5
-Output 3       GPIO18
-Output 4       GPIO19
+Float 1        GPIO32
+Float 2        GPIO33
+Float 3        GPIO25
+Float 4        GPIO26
+SSR 1 input    GPIO27
+SSR 2 input    GPIO14
 ```
 
 Commands:
@@ -62,9 +60,21 @@ floats
 help
 ```
 
-Before connecting hardware, confirm the GPIO mapping and active-low/active-high
-polarity in `config/Pins.h` and `config/Settings.h`. The default float wiring
-uses `INPUT_PULLUP`, with the reed switch closing to GND.
+For each SSR-40DA, connect ESP32 GPIO to input `3 (+)` and ESP32 GND to input
+`4 (-)`. SSR output terminals `1/2` are the AC switching path; never connect
+AC to input terminals `3/4`. The default float wiring uses `INPUT_PULLUP`,
+with each reed switch wired between its GPIO and GND.
+
+SSR output commands:
+
+```text
+on 1       # SSR 1 ON
+off 1      # SSR 1 OFF
+on 2       # SSR 2 ON
+off 2      # SSR 2 OFF
+alloff     # both SSRs OFF
+status
+```
 
 When a float state changes, the firmware prints a BE-ready event:
 
@@ -101,6 +111,3 @@ pio run -t upload
 pio device monitor
 ```
 
-Network communication with CrabSense BE is intentionally not implemented in
-this initial scaffold. Add the transport and device protocol after the ESP
-pinout and command contract are confirmed.

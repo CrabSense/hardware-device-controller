@@ -6,9 +6,9 @@
 #define FLOAT_DEBOUNCE_MS 50
 #define FLOAT_LOG_INTERVAL_MS 2000
 
-// Keep outputs safe until the wiring and polarity are confirmed.
-#define OUTPUT_ACTIVE_LEVEL LOW
-#define OUTPUT_INACTIVE_LEVEL HIGH
+// SSR-40DA input is active-high: HIGH enables the SSR, LOW disables it.
+#define OUTPUT_ACTIVE_LEVEL HIGH
+#define OUTPUT_INACTIVE_LEVEL LOW
 
 // Reed switch closed to GND is treated as an active float signal.
 #define FLOAT_ACTIVE_LEVEL LOW

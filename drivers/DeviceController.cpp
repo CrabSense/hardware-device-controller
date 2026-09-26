@@ -7,15 +7,14 @@ namespace
 {
 constexpr uint8_t outputPins[] = {
     PIN_OUTPUT_1,
-    PIN_OUTPUT_2,
-    PIN_OUTPUT_3,
-    PIN_OUTPUT_4};
+    PIN_OUTPUT_2};
+constexpr uint8_t outputCount = sizeof(outputPins) / sizeof(outputPins[0]);
 
-bool outputState[sizeof(outputPins) / sizeof(outputPins[0])] = {};
+bool outputState[outputCount] = {};
 
 bool validChannel(uint8_t channel)
 {
-    return channel >= 1 && channel <= (sizeof(outputPins) / sizeof(outputPins[0]));
+    return channel >= 1 && channel <= outputCount;
 }
 }
 
@@ -24,7 +23,7 @@ void setupDeviceController()
     pinMode(PIN_STATUS_LED, OUTPUT);
     digitalWrite(PIN_STATUS_LED, LOW);
 
-    for (uint8_t channel = 1; channel <= 4; ++channel)
+    for (uint8_t channel = 1; channel <= outputCount; ++channel)
     {
         pinMode(outputPins[channel - 1], OUTPUT);
     }
@@ -34,7 +33,7 @@ void setupDeviceController()
 
 void allOutputsOff()
 {
-    for (uint8_t channel = 1; channel <= 4; ++channel)
+    for (uint8_t channel = 1; channel <= outputCount; ++channel)
     {
         digitalWrite(outputPins[channel - 1], OUTPUT_INACTIVE_LEVEL);
         outputState[channel - 1] = false;
