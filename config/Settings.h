@@ -4,7 +4,7 @@
 #define SERIAL_BAUD_RATE 115200
 #define COMMAND_BUFFER_SIZE 64
 #define FLOAT_DEBOUNCE_MS 50
-#define FLOAT_LOG_INTERVAL_MS 1000
+#define FLOAT_LOG_INTERVAL_MS 2000
 
 // Keep outputs safe until the wiring and polarity are confirmed.
 #define OUTPUT_ACTIVE_LEVEL LOW

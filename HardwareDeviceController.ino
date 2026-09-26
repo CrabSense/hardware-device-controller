@@ -55,6 +55,7 @@ void loop()
     if (now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)
     {
         lastFloatLogAt = now;
+        Serial.println("----");
         printFloatStatus();
     }
 }
