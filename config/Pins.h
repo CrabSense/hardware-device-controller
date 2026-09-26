@@ -11,9 +11,9 @@
 #define PIN_OUTPUT_4 19
 
 // Float/reed inputs. Wire each switch between the GPIO and GND.
-#define PIN_TANK_1_LOW 13
-#define PIN_TANK_1_HIGH 14
-#define PIN_TANK_2_LOW 16
-#define PIN_TANK_2_HIGH 17
+#define PIN_FLOAT_1 13
+#define PIN_FLOAT_2 14
+#define PIN_FLOAT_3 16
+#define PIN_FLOAT_4 17
 
 #endif

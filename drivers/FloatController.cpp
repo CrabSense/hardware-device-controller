@@ -16,10 +16,10 @@ struct FloatInput
 };
 
 FloatInput inputs[] = {
-    {"Phao 1 - Tank 1 LOW", "tank_01_low", PIN_TANK_1_LOW, false, false, 0},
-    {"Phao 2 - Tank 1 HIGH", "tank_01_high", PIN_TANK_1_HIGH, false, false, 0},
-    {"Phao 3 - Tank 2 LOW", "tank_02_low", PIN_TANK_2_LOW, false, false, 0},
-    {"Phao 4 - Tank 2 HIGH", "tank_02_high", PIN_TANK_2_HIGH, false, false, 0}};
+    {"Phao 1", "float_1", PIN_FLOAT_1, false, false, 0},
+    {"Phao 2", "float_2", PIN_FLOAT_2, false, false, 0},
+    {"Phao 3", "float_3", PIN_FLOAT_3, false, false, 0},
+    {"Phao 4", "float_4", PIN_FLOAT_4, false, false, 0}};
 
 constexpr size_t inputCount = sizeof(inputs) / sizeof(inputs[0]);
 

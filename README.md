@@ -30,20 +30,20 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
 - ESP32 DevKit V1 (`esp32dev`) target
 - Four safe-by-default digital outputs
 - Four debounced float/reed inputs:
-  - `tank_01_low`
-  - `tank_01_high`
-  - `tank_02_low`
-  - `tank_02_high`
+  - `float_1`
+  - `float_2`
+  - `float_3`
+  - `float_4`
 - Serial command interface at `115200` baud
 - Emergency-safe startup state: all outputs are disabled
 
 Pin mapping for the current ESP32 DevKit V1:
 
 ```text
-Float T1 LOW   GPIO13
-Float T1 HIGH  GPIO14
-Float T2 LOW   GPIO16
-Float T2 HIGH  GPIO17
+Float 1        GPIO13
+Float 2        GPIO14
+Float 3        GPIO16
+Float 4        GPIO17
 Output 1       GPIO4
 Output 2       GPIO5
 Output 3       GPIO18
@@ -68,11 +68,11 @@ uses `INPUT_PULLUP`, with the reed switch closing to GND.
 When a float state changes, the firmware prints a BE-ready event:
 
 ```json
-{"sensor":"tank_01_low","state":true}
+{"sensor":"float_1","state":true}
 ```
 
 `true` means the contact is closed/active. Whether that means "low", "high",
-"empty", or "full" is a configuration decision outside the ESP firmware.
+"empty", or "full" is assigned later by BE/FE, outside the ESP firmware.
 
 ## Build and upload
 
