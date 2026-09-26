@@ -268,7 +268,7 @@ void EdgeNetwork::handleCommand()
     }
     else if (command == "on" || command == "off" || command == "toggle")
     {
-        if (channel < 1 || channel > 4)
+        if (channel < 1 || channel > 2)
             success = false;
         else
         {

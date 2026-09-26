@@ -8,7 +8,7 @@ namespace
 void reportOutputs()
 {
     Serial.print("OUTPUTS:");
-    for (uint8_t channel = 1; channel <= 4; ++channel)
+    for (uint8_t channel = 1; channel <= 2; ++channel)
     {
         Serial.print(" ");
         Serial.print(channel);
@@ -24,8 +24,8 @@ void printCommandHelp()
     Serial.println();
     Serial.println("CrabSense device controller");
     Serial.println("Commands:");
-    Serial.println("  on <1-4>       Enable output");
-    Serial.println("  off <1-4>      Disable output");
+    Serial.println("  on <1-2>       Enable SSR");
+    Serial.println("  off <1-2>      Disable SSR");
     Serial.println("  alloff         Disable every output");
     Serial.println("  status         Show output states");
     Serial.println("  floats         Print all float states as JSON");
