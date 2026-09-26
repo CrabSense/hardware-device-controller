@@ -323,8 +323,11 @@ void EdgeNetwork::publishTelemetry()
         return;
     http.addHeader("Content-Type", "application/json");
     const int code = http.POST(payload);
-    Serial.print("Kiosk telemetry ");
-    Serial.println(code);
+    if (code != 200 && code != 201)
+    {
+        Serial.print("Kiosk telemetry ERR ");
+        Serial.println(code);
+    }
     http.end();
 }
 
