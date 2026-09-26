@@ -7,6 +7,7 @@ namespace
 {
 struct FloatInput
 {
+    const char *displayName;
     const char *sensorCode;
     uint8_t pin;
     bool stableState;
@@ -15,10 +16,10 @@ struct FloatInput
 };
 
 FloatInput inputs[] = {
-    {"tank_01_low", PIN_TANK_1_LOW, false, false, 0},
-    {"tank_01_high", PIN_TANK_1_HIGH, false, false, 0},
-    {"tank_02_low", PIN_TANK_2_LOW, false, false, 0},
-    {"tank_02_high", PIN_TANK_2_HIGH, false, false, 0}};
+    {"Phao 1 - Tank 1 LOW", "tank_01_low", PIN_TANK_1_LOW, false, false, 0},
+    {"Phao 2 - Tank 1 HIGH", "tank_01_high", PIN_TANK_1_HIGH, false, false, 0},
+    {"Phao 3 - Tank 2 LOW", "tank_02_low", PIN_TANK_2_LOW, false, false, 0},
+    {"Phao 4 - Tank 2 HIGH", "tank_02_high", PIN_TANK_2_HIGH, false, false, 0}};
 
 constexpr size_t inputCount = sizeof(inputs) / sizeof(inputs[0]);
 
@@ -75,6 +76,10 @@ void printFloatStatus()
 {
     for (const FloatInput &input : inputs)
     {
-        printReading(input);
+        Serial.print(input.displayName);
+        Serial.print(" [GPIO");
+        Serial.print(input.pin);
+        Serial.print("]: ");
+        Serial.println(input.stableState ? "ON" : "OFF");
     }
 }
