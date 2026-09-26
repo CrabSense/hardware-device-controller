@@ -41,12 +41,12 @@ The layout follows `hardware-crabmonitor-ai`: board configuration is kept in
 Pin mapping for the current ESP32 DevKit V1:
 
 ```text
-Float 1        GPIO32
-Float 2        GPIO33
-Float 3        GPIO25
-Float 4        GPIO26
+Float 1        GPIO13
+Float 2        GPIO14
+Float 3        GPIO16
+Float 4        GPIO17
 SSR 1 input    GPIO27
-SSR 2 input    GPIO14
+SSR 2 input    GPIO4
 ```
 
 Commands:

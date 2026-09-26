@@ -6,12 +6,12 @@
 
 // SSR channels. These pins drive only the low-voltage SSR inputs.
 #define PIN_OUTPUT_1 27
-#define PIN_OUTPUT_2 14
+#define PIN_OUTPUT_2 4
 
-// Float/reed inputs. Wire each switch between the GPIO and GND.
-#define PIN_FLOAT_1 32
-#define PIN_FLOAT_2 33
-#define PIN_FLOAT_3 25
-#define PIN_FLOAT_4 26
+// Float/reed inputs. Keep the original float wiring.
+#define PIN_FLOAT_1 13
+#define PIN_FLOAT_2 14
+#define PIN_FLOAT_3 16
+#define PIN_FLOAT_4 17
 
 #endif
