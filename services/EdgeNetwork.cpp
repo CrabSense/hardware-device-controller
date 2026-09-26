@@ -25,14 +25,20 @@ void EdgeNetwork::begin()
     password = preferences.getString("password", "");
     kioskUrl = preferences.getString("kioskUrl", DEFAULT_KIOSK_URL);
 
+    server.on("/", HTTP_GET, []() { instance->handleProvisionPage(); });
+    server.on("/generate_204", HTTP_GET, []() { instance->handleProvisionPage(); });
+    server.on("/hotspot-detect.html", HTTP_GET,
+              []() { instance->handleProvisionPage(); });
     server.on("/api/info", HTTP_GET, []() { instance->handleInfo(); });
     server.on("/api/provision", HTTP_OPTIONS, []() { server.send(204); });
     server.on("/api/provision", HTTP_POST, []() { instance->handleProvision(); });
+    server.on("/configure", HTTP_POST,
+              []() { instance->handleProvisionForm(); });
     server.on("/api/command", HTTP_POST, []() { instance->handleCommand(); });
     server.on("/api/status", HTTP_GET, []() { instance->handleInfo(); });
-    server.begin();
 
     connectWifi();
+    server.begin();
 }
 
 void EdgeNetwork::loop()
@@ -95,6 +101,64 @@ void EdgeNetwork::startProvisioningAp()
     Serial.print("Provisioning AP: ");
     Serial.println(apName());
     Serial.println("POST /api/provision with ssid, password, kioskUrl");
+}
+
+void EdgeNetwork::handleProvisionPage()
+{
+    String html = R"rawliteral(
+<!doctype html>
+<html lang="vi">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CrabSense C115 - Cau hinh Wi-Fi</title>
+<style>
+body{font-family:Arial,sans-serif;background:#eef8f5;color:#173b4d;margin:0;padding:24px}
+main{max-width:460px;margin:auto;background:white;border-radius:18px;padding:24px;
+box-shadow:0 8px 30px #174b5626}h1{margin-top:0;color:#087f68}
+label{display:block;margin-top:16px;font-weight:bold}input{box-sizing:border-box;
+width:100%;padding:12px;margin-top:6px;border:1px solid #b7d9d0;border-radius:9px;
+font-size:16px}button{width:100%;padding:13px;margin-top:22px;border:0;border-radius:9px;
+background:#07866d;color:white;font-size:16px;font-weight:bold}small{color:#607d85}
+</style>
+<main>
+<h1>CrabSense-C115</h1>
+<p>Cấu hình Wi-Fi cho bộ điều khiển ESP32.</p>
+<form method="post" action="/configure">
+<label>Wi-Fi trại</label>
+<input name="ssid" required placeholder="Tên Wi-Fi">
+<label>Mật khẩu Wi-Fi</label>
+<input name="password" type="password" placeholder="Mật khẩu">
+<label>Kiosk URL</label>
+<input name="kioskUrl" required value="http://192.168.1.95:8090">
+<small>Ví dụ: http://192.168.1.95:8090</small>
+<button type="submit">Lưu và kết nối</button>
+</form>
+</main>
+</html>
+)rawliteral";
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "text/html; charset=utf-8", html);
+}
+
+void EdgeNetwork::handleProvisionForm()
+{
+    const String newSsid = server.arg("ssid");
+    const String newPassword = server.arg("password");
+    const String newKioskUrl = server.arg("kioskUrl");
+    if (newSsid.isEmpty() || newKioskUrl.isEmpty())
+    {
+        server.send(400, "text/plain; charset=utf-8",
+                    "SSID và Kiosk URL là bắt buộc");
+        return;
+    }
+
+    preferences.putString("ssid", newSsid);
+    preferences.putString("password", newPassword);
+    preferences.putString("kioskUrl", newKioskUrl);
+    server.send(200, "text/html; charset=utf-8",
+                "<h2>Đã lưu cấu hình</h2><p>ESP đang khởi động lại. "
+                "Bạn có thể đóng trang này.</p>");
+    restartPending = true;
+    restartAt = millis() + 1000;
 }
 
 void EdgeNetwork::handleInfo()
@@ -234,7 +298,7 @@ String EdgeNetwork::deviceCode() const
 
 String EdgeNetwork::apName() const
 {
-    return "CrabSense-" + deviceCode().substring(6);
+    return "CrabSense-C115";
 }
 
 String EdgeNetwork::macAddress() const

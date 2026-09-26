@@ -12,6 +12,8 @@ public:
 private:
     void connectWifi();
     void startProvisioningAp();
+    void handleProvisionPage();
+    void handleProvisionForm();
     void handleInfo();
     void handleProvision();
     void handleCommand();
