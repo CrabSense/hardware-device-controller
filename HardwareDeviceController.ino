@@ -8,6 +8,7 @@
 namespace
 {
 String commandBuffer;
+unsigned long lastFloatLogAt = 0;
 
 void readSerialCommands()
 {
@@ -49,4 +50,11 @@ void loop()
 {
     pollFloatInputs();
     readSerialCommands();
+
+    const unsigned long now = millis();
+    if (now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)
+    {
+        lastFloatLogAt = now;
+        printFloatStatus();
+    }
 }
