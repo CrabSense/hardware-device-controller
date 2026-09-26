@@ -313,10 +313,7 @@ void EdgeNetwork::publishTelemetry()
 
 String EdgeNetwork::deviceCode() const
 {
-    const uint64_t chipId = ESP.getEfuseMac();
-    char value[24];
-    snprintf(value, sizeof(value), "ESP32-%04X", static_cast<uint16_t>(chipId));
-    return String(value);
+    return "CrabSense-C115";
 }
 
 String EdgeNetwork::apName() const
