@@ -188,11 +188,18 @@ void EdgeNetwork::handleInfo()
 {
     JsonDocument doc;
     doc["deviceCode"] = deviceCode();
+    doc["apName"] = apName();
+    doc["controllerType"] = "ras_controller";
+    doc["firmware"] = "1.0.0";
+    doc["board"] = "ESP32 DevKit V1";
     doc["mac"] = macAddress();
     doc["ipAddress"] = WiFi.localIP().toString();
+    doc["staIp"] = WiFi.localIP().toString();
+    doc["wifiSsid"] = WiFi.SSID();
     doc["kioskUrl"] = kioskUrl;
     doc["connected"] = WiFi.isConnected();
     doc["provisioning"] = provisioningMode;
+    doc["provisioned"] = !provisioningMode;
 
     String body;
     serializeJson(doc, body);
