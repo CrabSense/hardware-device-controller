@@ -3,6 +3,7 @@
 #include "../config/Settings.h"
 #include "../drivers/DeviceController.h"
 #include "../drivers/FloatController.h"
+#include "../modules/CommandRouter.h"
 
 #include <ArduinoJson.h>
 #include <DNSServer.h>
@@ -256,12 +257,33 @@ void EdgeNetwork::handleCommand()
         return;
     }
 
+    stopSsrTest();
+
     String command = String(doc["command"] | "");
     command.toLowerCase();
-    const String channelText = String(doc["channel"] | "");
-    const int channel = channelText.toInt();
-    bool success = true;
+    command.trim();
 
+    int channel = 0;
+    JsonVariant channelValue = doc["channel"];
+    if (channelValue.is<int>())
+        channel = channelValue.as<int>();
+    else
+    {
+        const char *rawChannel = channelValue.as<const char *>();
+        String channelText = rawChannel ? String(rawChannel) : String("");
+        channelText.toLowerCase();
+        channelText.trim();
+        if (channelText == "1" || channelText == "ssr1" || channelText == "pump1"
+            || channelText == "pump_01" || channelText == "pump_1")
+            channel = 1;
+        else if (channelText == "2" || channelText == "ssr2" || channelText == "pump2"
+                 || channelText == "pump_02" || channelText == "pump_2")
+            channel = 2;
+        else
+            channel = channelText.toInt();
+    }
+
+    bool success = true;
     if (command == "alloff")
     {
         allOutputsOff();
@@ -286,11 +308,15 @@ void EdgeNetwork::handleCommand()
     JsonDocument response;
     response["success"] = success;
     response["command"] = command;
-    response["channel"] = channelText;
+    response["channel"] = channel;
+    response["output1"] = isOutputEnabled(1);
+    response["output2"] = isOutputEnabled(2);
     response["message"] = success ? "Applied" : "Invalid command or channel";
     String body;
     serializeJson(response, body);
     server.send(success ? 200 : 400, "application/json", body);
+    Serial.print("API ");
+    Serial.println(body);
 }
 
 void EdgeNetwork::publishTelemetry()

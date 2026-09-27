@@ -49,7 +49,7 @@ void setup()
     printCommandHelp();
     printFloatStatus();
     handleSerialCommand("quiet");
-    handleSerialCommand("test");
+    allOutputsOff();
 }
 
 void loop()

@@ -6,17 +6,7 @@
 namespace
 {
 bool floatLogEnabled = true;
-bool ssrTestEnabled = false;
-bool ssrTestOn = false;
-unsigned long ssrTestChangedAt = 0;
 constexpr unsigned long SSR_TEST_INTERVAL_MS = 10000;
-
-void stopSsrTest()
-{
-    ssrTestEnabled = false;
-    ssrTestOn = false;
-    ssrTestChangedAt = 0;
-}
 
 void reportOutputs()
 {
@@ -30,6 +20,20 @@ void reportOutputs()
     }
     Serial.println();
 }
+}
+
+namespace
+{
+bool ssrTestEnabled = false;
+bool ssrTestOn = false;
+unsigned long ssrTestChangedAt = 0;
+}
+
+void stopSsrTest()
+{
+    ssrTestEnabled = false;
+    ssrTestOn = false;
+    ssrTestChangedAt = 0;
 }
 
 void printCommandHelp()
