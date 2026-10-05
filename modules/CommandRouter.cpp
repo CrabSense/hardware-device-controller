@@ -2,6 +2,7 @@
 
 #include "../drivers/DeviceController.h"
 #include "../drivers/FloatController.h"
+#include "../drivers/PowerMeter.h"
 
 namespace
 {
@@ -46,6 +47,7 @@ void printCommandHelp()
     Serial.println("  alloff         Disable every output");
     Serial.println("  status         Show output states");
     Serial.println("  floats         Print all float states");
+    Serial.println("  meter          Poll RS485 power meter");
     Serial.println("  quiet          Stop repeating float log");
     Serial.println("  log            Resume repeating float log");
     Serial.println("  test           Toggle both SSRs every 10s");
@@ -100,6 +102,12 @@ void handleSerialCommand(const String &command)
     if (command.equalsIgnoreCase("floats"))
     {
         printFloatStatus();
+        return;
+    }
+
+    if (command.equalsIgnoreCase("meter"))
+    {
+        printPowerMeterStatus();
         return;
     }
 

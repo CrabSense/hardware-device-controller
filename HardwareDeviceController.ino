@@ -3,6 +3,7 @@
 #include "config/Settings.h"
 #include "drivers/DeviceController.h"
 #include "drivers/FloatController.h"
+#include "drivers/PowerMeter.h"
 #include "modules/CommandRouter.h"
 #include "services/EdgeNetwork.h"
 
@@ -44,6 +45,7 @@ void setup()
 
     setupDeviceController();
     setupFloatController();
+    setupPowerMeter();
     edgeNetwork.begin();
     Serial.println("READY");
     printCommandHelp();
@@ -55,6 +57,7 @@ void setup()
 void loop()
 {
     pollFloatInputs();
+    pollPowerMeter();
     readSerialCommands();
     pollSsrTest();
     edgeNetwork.loop();

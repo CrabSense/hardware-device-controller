@@ -14,4 +14,8 @@
 #define PIN_FLOAT_3 16
 #define PIN_FLOAT_4 17
 
+// UART2 for XY-485. GPIO26 is already SSR 2.
+#define PIN_RS485_RX 32
+#define PIN_RS485_TX 33
+
 #endif
