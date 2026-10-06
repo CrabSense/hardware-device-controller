@@ -19,6 +19,6 @@
 
 #define RS485_BAUD_RATE 9600
 #define RS485_POLL_INTERVAL_MS 2000
-#define RS485_SLAVE_ADDR 1
+#define RS485_SLAVE_ADDR 2
 
 #endif

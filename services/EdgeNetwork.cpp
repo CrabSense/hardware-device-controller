@@ -3,6 +3,7 @@
 #include "../config/Settings.h"
 #include "../drivers/DeviceController.h"
 #include "../drivers/FloatController.h"
+#include "../drivers/PowerMeter.h"
 #include "../modules/CommandRouter.h"
 
 #include <ArduinoJson.h>
@@ -340,6 +341,25 @@ void EdgeNetwork::publishTelemetry()
         reading["pin"] = getFloatPin(i);
         reading["val"] = getFloatState(i) ? 1 : 0;
         reading["sensor"] = getFloatSensorCode(i);
+        reading["unit"] = "state";
+    }
+    MeterReading meter{};
+    if (latestMeter(&meter))
+    {
+        auto add = [&](const char *code, float value, const char *unit) {
+            JsonObject reading = readings.add<JsonObject>();
+            reading["pin"] = 33;
+            reading["val"] = value;
+            reading["sensor"] = code;
+            reading["unit"] = unit;
+        };
+        add("meter_v", meter.volts, "V");
+        add("meter_a", meter.amps, "A");
+        add("meter_w", meter.watts, "W");
+        add("meter_va", meter.va, "VA");
+        add("meter_kwh", meter.kwh, "kWh");
+        add("meter_hz", meter.hertz, "Hz");
+        add("meter_pf", meter.pf, "%");
     }
 
     String payload;

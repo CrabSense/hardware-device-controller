@@ -11,6 +11,7 @@ HardwareSerial rs485(2);
 unsigned long lastPollAt = 0;
 uint8_t rxBuf[64];
 size_t rxLen = 0;
+MeterReading lastReading{};
 
 uint16_t crc16(const uint8_t *data, size_t len)
 {
@@ -42,6 +43,16 @@ void drainRx()
         rxBuf[rxLen++] = static_cast<uint8_t>(rs485.read());
 }
 
+void waitRx(unsigned long ms)
+{
+    const unsigned long start = millis();
+    while (millis() - start < ms)
+    {
+        drainRx();
+        delay(1);
+    }
+}
+
 void sendRead(uint8_t fn, uint16_t start, uint16_t count)
 {
     uint8_t req[8] = {
@@ -63,6 +74,11 @@ void sendRead(uint8_t fn, uint16_t start, uint16_t count)
     rs485.flush();
 }
 
+uint16_t regAt(uint8_t i)
+{
+    return static_cast<uint16_t>((rxBuf[3 + i * 2] << 8) | rxBuf[4 + i * 2]);
+}
+
 void parseIfPossible()
 {
     if (rxLen < 7)
@@ -75,27 +91,65 @@ void parseIfPossible()
     const uint8_t bytes = rxBuf[2];
     if (rxLen < static_cast<size_t>(5 + bytes))
         return;
-
-    Serial.println("RS485 parsed:");
-    for (uint8_t i = 0; i + 1 < bytes; i += 2)
+    const uint8_t n = bytes / 2;
+    if (n > 16)
     {
-        const uint16_t reg = (rxBuf[3 + i] << 8) | rxBuf[4 + i];
-        Serial.print("  reg[");
-        Serial.print(i / 2);
-        Serial.print("] = ");
-        Serial.println(reg);
+        lastReading.ok = true;
+        lastReading.volts = regAt(0) / 10.0f;
+        lastReading.amps = regAt(1) / 100.0f;
+        lastReading.watts = regAt(3);
+        lastReading.va = regAt(7);
+        lastReading.kwh = regAt(9) / 1000.0f;
+        lastReading.hertz = regAt(16) / 10.0f;
+        lastReading.pf = regAt(15);
     }
-    if (bytes >= 8)
+
+    Serial.println("meter:");
+    if (n > 0)
     {
-        const uint16_t voltage = (rxBuf[3] << 8) | rxBuf[4];
-        const uint16_t current = (rxBuf[5] << 8) | rxBuf[6];
-        const uint16_t power = (rxBuf[7] << 8) | rxBuf[8];
         Serial.print("  V=");
-        Serial.print(voltage / 10.0);
+        Serial.println(regAt(0) / 10.0, 2);
+    }
+    if (n > 1)
+    {
         Serial.print("  A=");
-        Serial.print(current / 100.0);
+        Serial.println(regAt(1) / 100.0, 3);
+    }
+    if (n > 3)
+    {
         Serial.print("  W=");
-        Serial.println(power / 10.0);
+        Serial.println(regAt(3) * 1.0, 1);
+    }
+    if (n > 7)
+    {
+        Serial.print("  VA=");
+        Serial.println(regAt(7) * 1.0, 1);
+    }
+    if (n > 9)
+    {
+        Serial.print("  kWh=");
+        Serial.println(regAt(9) / 1000.0, 3);
+    }
+    if (n > 11)
+    {
+        Serial.print("  min=");
+        Serial.println(regAt(11));
+    }
+    if (n > 12)
+    {
+        Serial.print("  C=");
+        Serial.println(static_cast<int16_t>(regAt(12)));
+    }
+    if (n > 15)
+    {
+        Serial.print("  PF=");
+        Serial.print(regAt(15));
+        Serial.println('%');
+    }
+    if (n > 16)
+    {
+        Serial.print("  Hz=");
+        Serial.println(regAt(16) / 10.0, 1);
     }
 }
 }
@@ -113,16 +167,21 @@ void setupPowerMeter()
 
 void pollPowerMeter()
 {
-    drainRx();
-
     const unsigned long now = millis();
     if (now - lastPollAt < RS485_POLL_INTERVAL_MS)
         return;
     lastPollAt = now;
 
+    while (rs485.available() > 0)
+        rs485.read();
+    rxLen = 0;
+
+    sendRead(0x03, 0x000E, 17);
+    waitRx(300);
+
     if (rxLen > 0)
     {
-        Serial.print("RS485 RX ");
+        Serial.print("UART RX ");
         Serial.print(rxLen);
         Serial.print("B: ");
         printHex(rxBuf, rxLen);
@@ -131,13 +190,19 @@ void pollPowerMeter()
     }
     else
     {
-        Serial.println("RS485 RX: (empty)");
+        Serial.println("UART RX: (empty)");
     }
-
-    sendRead(0x03, 0x0000, 8);
 }
 
 void printPowerMeterStatus()
 {
     pollPowerMeter();
+}
+
+bool latestMeter(MeterReading *out)
+{
+    if (out == nullptr || !lastReading.ok)
+        return false;
+    *out = lastReading;
+    return true;
 }
