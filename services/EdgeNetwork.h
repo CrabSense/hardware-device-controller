@@ -19,6 +19,7 @@ private:
     void handleProvision();
     void handleCommand();
     void publishTelemetry();
+    void registerWithKiosk();
     String deviceCode() const;
     String apName() const;
     String macAddress() const;
@@ -26,10 +27,12 @@ private:
     String ssid;
     String password;
     String kioskUrl;
+    String controllerSecret;
     bool provisioningMode = false;
     bool restartPending = false;
     unsigned long restartAt = 0;
     unsigned long lastTelemetryAt = 0;
+    unsigned long lastRegisterAt = 0;
 };
 
 #endif

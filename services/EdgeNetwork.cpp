@@ -4,7 +4,6 @@
 #include "../drivers/DeviceController.h"
 #include "../drivers/FloatController.h"
 #include "../drivers/PowerMeter.h"
-#include "../modules/CommandRouter.h"
 
 #include <ArduinoJson.h>
 #include <DNSServer.h>
@@ -28,6 +27,7 @@ void EdgeNetwork::begin()
     ssid = preferences.getString("ssid", "");
     password = preferences.getString("password", "");
     kioskUrl = preferences.getString("kioskUrl", DEFAULT_KIOSK_URL);
+    controllerSecret = preferences.getString("controllerSecret", "");
 
     server.on("/", HTTP_GET, []() { instance->handleProvisionPage(); });
     server.on("/generate_204", HTTP_GET, []() { instance->handleProvisionPage(); });
@@ -76,6 +76,8 @@ void EdgeNetwork::loop()
 
     if (!WiFi.isConnected())
         return;
+
+    registerWithKiosk();
 
     if (millis() - lastTelemetryAt < TELEMETRY_INTERVAL_MS)
         return;
@@ -258,8 +260,6 @@ void EdgeNetwork::handleCommand()
         return;
     }
 
-    stopSsrTest();
-
     String command = String(doc["command"] | "");
     command.toLowerCase();
     command.trim();
@@ -318,6 +318,62 @@ void EdgeNetwork::handleCommand()
     server.send(success ? 200 : 400, "application/json", body);
     Serial.print("API ");
     Serial.println(body);
+}
+
+void EdgeNetwork::registerWithKiosk()
+{
+    if (lastRegisterAt != 0 && millis() - lastRegisterAt < 15000)
+        return;
+    lastRegisterAt = millis();
+
+    String base = kioskUrl;
+    base.trim();
+    while (base.endsWith("/"))
+        base.remove(base.length() - 1);
+    if (base.isEmpty())
+        return;
+
+    JsonDocument doc;
+    doc["deviceCode"] = deviceCode();
+    doc["controller_id"] = deviceCode();
+    doc["mac"] = macAddress();
+    doc["firmware"] = "1.0.0";
+    doc["hardware"] = "ESP32-V1";
+    doc["ipAddress"] = WiFi.localIP().toString();
+    String payload;
+    serializeJson(doc, payload);
+
+    HTTPClient http;
+    if (!http.begin(base + "/api/controllers/register"))
+        return;
+    http.addHeader("Content-Type", "application/json");
+    const int code = http.POST(payload);
+    if (code == 200 || code == 201)
+    {
+        JsonDocument response;
+        if (deserializeJson(response, http.getString()) == DeserializationError::Ok)
+        {
+            const char *secret = response["secret"];
+            if (secret != nullptr && secret[0] != '\0')
+            {
+                controllerSecret = secret;
+                preferences.putString("controllerSecret", controllerSecret);
+                Serial.println("Controller credential saved");
+            }
+            const char *status = response["status"];
+            if (status != nullptr)
+            {
+                Serial.print("Controller status ");
+                Serial.println(status);
+            }
+        }
+    }
+    else
+    {
+        Serial.print("Kiosk register ERR ");
+        Serial.println(code);
+    }
+    http.end();
 }
 
 void EdgeNetwork::publishTelemetry()
