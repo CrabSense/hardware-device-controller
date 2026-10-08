@@ -59,7 +59,6 @@ void loop()
     pollFloatInputs();
     pollPowerMeter();
     readSerialCommands();
-    pollSsrTest();
     edgeNetwork.loop();
 
     const unsigned long now = millis();

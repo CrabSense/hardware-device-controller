@@ -65,3 +65,13 @@ bool isOutputEnabled(uint8_t channel)
 {
     return validChannel(channel) && outputState[channel - 1];
 }
+
+uint8_t getOutputCount()
+{
+    return outputCount;
+}
+
+uint8_t getOutputPin(uint8_t index)
+{
+    return index < outputCount ? outputPins[index] : 0;
+}

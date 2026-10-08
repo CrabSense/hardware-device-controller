@@ -13,6 +13,7 @@ private:
     void connectWifi();
     void startProvisioningAp();
     void handleProvisionPage();
+    void handleCaptiveRedirect();
     void handleProvisionForm();
     void handleInfo();
     void handleRestart();

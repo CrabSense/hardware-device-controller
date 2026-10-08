@@ -6,7 +6,5 @@
 void printCommandHelp();
 void handleSerialCommand(const String &command);
 bool isFloatLogEnabled();
-void pollSsrTest();
-void stopSsrTest();
 
 #endif

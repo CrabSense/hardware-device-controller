@@ -7,7 +7,6 @@
 namespace
 {
 bool floatLogEnabled = true;
-constexpr unsigned long SSR_TEST_INTERVAL_MS = 10000;
 
 void reportOutputs()
 {
@@ -23,20 +22,6 @@ void reportOutputs()
 }
 }
 
-namespace
-{
-bool ssrTestEnabled = false;
-bool ssrTestOn = false;
-unsigned long ssrTestChangedAt = 0;
-}
-
-void stopSsrTest()
-{
-    ssrTestEnabled = false;
-    ssrTestOn = false;
-    ssrTestChangedAt = 0;
-}
-
 void printCommandHelp()
 {
     Serial.println();
@@ -50,8 +35,6 @@ void printCommandHelp()
     Serial.println("  meter          Poll RS485 power meter");
     Serial.println("  quiet          Stop repeating float log");
     Serial.println("  log            Resume repeating float log");
-    Serial.println("  test           Toggle both SSRs every 10s");
-    Serial.println("  stop           Stop SSR test");
     Serial.println("  help            Show this help");
     Serial.println();
 }
@@ -66,30 +49,8 @@ void handleSerialCommand(const String &command)
 
     if (command.equalsIgnoreCase("alloff"))
     {
-        stopSsrTest();
         allOutputsOff();
         Serial.println("OK all outputs OFF");
-        return;
-    }
-
-    if (command.equalsIgnoreCase("test"))
-    {
-        ssrTestEnabled = true;
-        ssrTestOn = true;
-        ssrTestChangedAt = millis();
-        setOutput(1, true);
-        setOutput(2, true);
-        Serial.println("OK SSR test ON 10s / OFF 10s");
-        reportOutputs();
-        return;
-    }
-
-    if (command.equalsIgnoreCase("stop"))
-    {
-        stopSsrTest();
-        allOutputsOff();
-        Serial.println("OK SSR test stopped");
-        reportOutputs();
         return;
     }
 
@@ -128,7 +89,6 @@ void handleSerialCommand(const String &command)
     int channel = 0;
     if (sscanf(command.c_str(), "on %d", &channel) == 1)
     {
-        stopSsrTest();
         if (!setOutput(channel, true))
         {
             Serial.println("ERR invalid channel");
@@ -141,7 +101,6 @@ void handleSerialCommand(const String &command)
 
     if (sscanf(command.c_str(), "off %d", &channel) == 1)
     {
-        stopSsrTest();
         if (!setOutput(channel, false))
         {
             Serial.println("ERR invalid channel");
@@ -158,21 +117,4 @@ void handleSerialCommand(const String &command)
 bool isFloatLogEnabled()
 {
     return floatLogEnabled;
-}
-
-void pollSsrTest()
-{
-    if (!ssrTestEnabled)
-        return;
-
-    if (millis() - ssrTestChangedAt < SSR_TEST_INTERVAL_MS)
-        return;
-
-    ssrTestChangedAt = millis();
-    ssrTestOn = !ssrTestOn;
-    setOutput(1, ssrTestOn);
-    setOutput(2, ssrTestOn);
-    Serial.print(ssrTestOn ? "TEST SSR ON 10s" : "TEST SSR OFF 10s");
-    Serial.println();
-    reportOutputs();
 }

@@ -30,22 +30,22 @@ void EdgeNetwork::begin()
     controllerSecret = preferences.getString("controllerSecret", "");
 
     server.on("/", HTTP_GET, []() { instance->handleProvisionPage(); });
-    server.on("/generate_204", HTTP_GET, []() { instance->handleProvisionPage(); });
+    server.on("/generate_204", HTTP_GET, []() { instance->handleCaptiveRedirect(); });
     server.on("/hotspot-detect.html", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.on("/connecttest.txt", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.on("/ncsi.txt", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.on("/success.txt", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.on("/fwlink", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.on("/redirect", HTTP_GET,
-              []() { instance->handleProvisionPage(); });
+              []() { instance->handleCaptiveRedirect(); });
     server.onNotFound([]() {
         if (instance->provisioningMode)
-            instance->handleProvisionPage();
+            instance->handleCaptiveRedirect();
         else
             server.send(404, "text/plain", "Not found");
     });
@@ -66,7 +66,10 @@ void EdgeNetwork::begin()
 void EdgeNetwork::loop()
 {
     if (provisioningMode)
-        dnsServer.processNextRequest();
+    {
+        for (uint8_t i = 0; i < 20; ++i)
+            dnsServer.processNextRequest();
+    }
     server.handleClient();
 
     if (restartPending && millis() >= restartAt)
@@ -123,11 +126,25 @@ void EdgeNetwork::startProvisioningAp()
 {
     provisioningMode = true;
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(apName().c_str());
+    WiFi.setSleep(false);
+    const bool apUp = WiFi.softAP(apName().c_str(), nullptr, 11);
+    dnsServer.setTTL(0);
     dnsServer.start(53, "*", WiFi.softAPIP());
+    if (!apUp)
+        Serial.println("Provisioning AP failed");
     Serial.print("Provisioning AP: ");
     Serial.println(apName());
     Serial.println("POST /api/provision with ssid, password, kioskUrl");
+}
+
+void EdgeNetwork::handleCaptiveRedirect()
+{
+    server.sendHeader("Location", "http://192.168.4.1/", true);
+    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server.sendHeader("Pragma", "no-cache");
+    server.send(302, "text/html",
+                "<html><head><meta http-equiv=\"refresh\" "
+                "content=\"0;url=http://192.168.4.1/\"></head></html>");
 }
 
 void EdgeNetwork::handleProvisionPage()
@@ -156,9 +173,6 @@ background:#07866d;color:white;font-size:16px;font-weight:bold}small{color:#607d
 <input id="password" name="password" type="password" placeholder="Mật khẩu">
 <label style="font-weight:normal"><input id="showPassword" type="checkbox"
 onchange="password.type=this.checked?'text':'password'"> Hiện mật khẩu</label>
-<label>Kiosk URL</label>
-<input name="kioskUrl" required value="http://192.168.1.95:8090">
-<small>Ví dụ: http://192.168.1.95:8090</small>
 <button type="submit">Lưu và kết nối</button>
 </form>
 </main>
@@ -173,16 +187,16 @@ void EdgeNetwork::handleProvisionForm()
     const String newSsid = server.arg("ssid");
     const String newPassword = server.arg("password");
     const String newKioskUrl = server.arg("kioskUrl");
-    if (newSsid.isEmpty() || newKioskUrl.isEmpty())
+    if (newSsid.isEmpty())
     {
-        server.send(400, "text/plain; charset=utf-8",
-                    "SSID và Kiosk URL là bắt buộc");
+        server.send(400, "text/plain; charset=utf-8", "SSID là bắt buộc");
         return;
     }
 
     preferences.putString("ssid", newSsid);
     preferences.putString("password", newPassword);
-    preferences.putString("kioskUrl", newKioskUrl);
+    if (!newKioskUrl.isEmpty())
+        preferences.putString("kioskUrl", newKioskUrl);
     server.send(200, "text/html; charset=utf-8",
                 "<h2>Đã lưu cấu hình</h2><p>ESP đang khởi động lại. "
                 "Bạn có thể đóng trang này.</p>");
@@ -206,6 +220,31 @@ void EdgeNetwork::handleInfo()
     doc["connected"] = WiFi.isConnected();
     doc["provisioning"] = provisioningMode;
     doc["provisioned"] = !provisioningMode;
+    doc["outputCount"] = getOutputCount();
+    doc["sensorCount"] = getFloatCount();
+
+    JsonArray outputs = doc["outputs"].to<JsonArray>();
+    for (uint8_t i = 0; i < getOutputCount(); ++i)
+    {
+        JsonObject item = outputs.add<JsonObject>();
+        item["channel"] = i + 1;
+        item["gpio"] = getOutputPin(i);
+        item["on"] = isOutputEnabled(i + 1);
+    }
+
+    JsonArray sensors = doc["sensors"].to<JsonArray>();
+    for (uint8_t i = 0; i < getFloatCount(); ++i)
+    {
+        JsonObject item = sensors.add<JsonObject>();
+        const uint8_t pin = getFloatPin(i);
+        item["sensorCode"] = getFloatSensorCode(i);
+        item["suffix"] = getFloatSensorCode(i);
+        item["gpio"] = pin;
+        item["interface"] = "GPIO";
+        item["channel"] = String("GPIO") + pin;
+        item["sensorType"] = "Float";
+        item["unit"] = "state";
+    }
 
     String body;
     serializeJson(doc, body);
@@ -232,17 +271,27 @@ void EdgeNetwork::handleProvision()
 
     const String newSsid = String(doc["ssid"] | "");
     const String newPassword = String(doc["password"] | "");
-    const String newKioskUrl = String(doc["kioskUrl"] | kioskUrl);
-    if (newSsid.isEmpty() || newKioskUrl.isEmpty())
+    const String newKioskUrl = String(doc["kioskUrl"] | "");
+    if (newSsid.isEmpty())
     {
-        server.send(400, "application/json",
-                    "{\"success\":false,\"message\":\"ssid and kioskUrl are required\"}");
+        if (newKioskUrl.isEmpty())
+        {
+            server.send(400, "application/json",
+                        "{\"success\":false,\"message\":\"ssid or kioskUrl is required\"}");
+            return;
+        }
+        kioskUrl = newKioskUrl;
+        preferences.putString("kioskUrl", kioskUrl);
+        lastRegisterAt = 0;
+        server.send(200, "application/json",
+                    "{\"success\":true,\"message\":\"Kiosk URL saved\"}");
         return;
     }
 
     preferences.putString("ssid", newSsid);
     preferences.putString("password", newPassword);
-    preferences.putString("kioskUrl", newKioskUrl);
+    if (!newKioskUrl.isEmpty())
+        preferences.putString("kioskUrl", newKioskUrl);
 
     server.send(200, "application/json",
                 "{\"success\":true,\"message\":\"Saved; restarting\"}");
@@ -300,6 +349,10 @@ void EdgeNetwork::handleCommand()
                 : command == "off" ? false : !isOutputEnabled(channel);
             success = setOutput(channel, enabled);
         }
+    }
+    else if (command == "status")
+    {
+        success = true;
     }
     else
     {
