@@ -11,6 +11,8 @@ struct MeterReading
     float kwh;
     float hertz;
     float pf;
+    float minutes;
+    float celsius;
 };
 
 void setupPowerMeter();

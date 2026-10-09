@@ -89,19 +89,27 @@ void parseIfPossible()
         return;
 
     const uint8_t bytes = rxBuf[2];
-    if (rxLen < static_cast<size_t>(5 + bytes))
+    const size_t frame = static_cast<size_t>(5 + bytes);
+    if (frame > sizeof(rxBuf) || rxLen < frame)
         return;
     const uint8_t n = bytes / 2;
-    if (n > 16)
+    const uint16_t got = static_cast<uint16_t>(rxBuf[frame - 2] | (rxBuf[frame - 1] << 8));
+    if (crc16(rxBuf, frame - 2) != got)
+        return;
+    // KWS-AC301 holding registers from 0x000E, 17 words.
+    if (n >= 17)
     {
+        const uint32_t energy = regAt(9) | (static_cast<uint32_t>(regAt(10)) << 16);
         lastReading.ok = true;
         lastReading.volts = regAt(0) / 10.0f;
-        lastReading.amps = regAt(1) / 100.0f;
-        lastReading.watts = regAt(3);
-        lastReading.va = regAt(7);
-        lastReading.kwh = regAt(9) / 1000.0f;
-        lastReading.hertz = regAt(16) / 10.0f;
+        lastReading.amps = regAt(1) / 1000.0f;
+        lastReading.watts = regAt(3) / 10.0f;
+        lastReading.va = regAt(7) / 10.0f;
+        lastReading.kwh = energy / 1000.0f;
+        lastReading.minutes = regAt(11);
+        lastReading.celsius = static_cast<int16_t>(regAt(12));
         lastReading.pf = regAt(15);
+        lastReading.hertz = regAt(16) / 10.0f;
     }
 
     Serial.println("meter:");
@@ -113,17 +121,17 @@ void parseIfPossible()
     if (n > 1)
     {
         Serial.print("  A=");
-        Serial.println(regAt(1) / 100.0, 3);
+        Serial.println(regAt(1) / 1000.0, 3);
     }
     if (n > 3)
     {
         Serial.print("  W=");
-        Serial.println(regAt(3) * 1.0, 1);
+        Serial.println(regAt(3) / 10.0, 1);
     }
     if (n > 7)
     {
         Serial.print("  VA=");
-        Serial.println(regAt(7) * 1.0, 1);
+        Serial.println(regAt(7) / 10.0, 1);
     }
     if (n > 9)
     {

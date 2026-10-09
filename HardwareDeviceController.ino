@@ -56,10 +56,10 @@ void setup()
 
 void loop()
 {
+    edgeNetwork.loop();
     pollFloatInputs();
     pollPowerMeter();
     readSerialCommands();
-    edgeNetwork.loop();
 
     const unsigned long now = millis();
     if (isFloatLogEnabled() && now - lastFloatLogAt >= FLOAT_LOG_INTERVAL_MS)

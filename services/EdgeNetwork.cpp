@@ -116,6 +116,7 @@ void EdgeNetwork::connectWifi()
     }
 
     Serial.println("\nWiFi connected");
+    WiFi.setSleep(false);
     Serial.print("ESP IP: ");
     Serial.println(WiFi.localIP());
     Serial.print("Kiosk URL: ");
@@ -400,6 +401,8 @@ void EdgeNetwork::registerWithKiosk()
     if (!http.begin(base + "/api/controllers/register"))
         return;
     http.addHeader("Content-Type", "application/json");
+    http.setConnectTimeout(300);
+    http.setTimeout(400);
     const int code = http.POST(payload);
     if (code == 200 || code == 201)
     {
@@ -469,6 +472,8 @@ void EdgeNetwork::publishTelemetry()
         add("meter_kwh", meter.kwh, "kWh");
         add("meter_hz", meter.hertz, "Hz");
         add("meter_pf", meter.pf, "%");
+        add("meter_min", meter.minutes, "min");
+        add("meter_c", meter.celsius, "C");
     }
 
     String payload;
@@ -477,6 +482,8 @@ void EdgeNetwork::publishTelemetry()
     if (!http.begin(base + "/api/telemetry"))
         return;
     http.addHeader("Content-Type", "application/json");
+    http.setConnectTimeout(300);
+    http.setTimeout(400);
     const int code = http.POST(payload);
     if (code != 200 && code != 201)
     {
