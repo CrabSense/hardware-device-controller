@@ -7,14 +7,18 @@ namespace
 {
 constexpr uint8_t outputPins[] = {
     PIN_OUTPUT_1,
-    PIN_OUTPUT_2};
+    PIN_OUTPUT_2,
+    PIN_OUTPUT_3,
+    PIN_OUTPUT_4};
 constexpr uint8_t outputCount = sizeof(outputPins) / sizeof(outputPins[0]);
 
 bool outputState[outputCount] = {};
 
 void updateStatusLed()
 {
-    const bool anyOn = outputState[0] || (outputCount > 1 && outputState[1]);
+    bool anyOn = false;
+    for (uint8_t i = 0; i < outputCount; ++i)
+        anyOn = anyOn || outputState[i];
     digitalWrite(PIN_STATUS_LED, anyOn ? HIGH : LOW);
 }
 

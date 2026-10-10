@@ -341,7 +341,7 @@ void EdgeNetwork::handleCommand()
     }
     else if (command == "on" || command == "off" || command == "toggle")
     {
-        if (channel < 1 || channel > 2)
+        if (channel < 1 || channel > getOutputCount())
             success = false;
         else
         {
@@ -364,8 +364,12 @@ void EdgeNetwork::handleCommand()
     response["success"] = success;
     response["command"] = command;
     response["channel"] = channel;
-    response["output1"] = isOutputEnabled(1);
-    response["output2"] = isOutputEnabled(2);
+    for (uint8_t i = 1; i <= getOutputCount(); ++i)
+    {
+        char key[12];
+        snprintf(key, sizeof(key), "output%u", i);
+        response[key] = isOutputEnabled(i);
+    }
     response["message"] = success ? "Applied" : "Invalid command or channel";
     String body;
     serializeJson(response, body);

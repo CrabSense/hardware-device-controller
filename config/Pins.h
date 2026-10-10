@@ -5,8 +5,11 @@
 #define PIN_STATUS_LED 2
 
 // SSR channels. These pins drive only the low-voltage SSR inputs.
+// GPIO25 and GPIO27 sit beside GPIO26 on the DevKit header.
 #define PIN_OUTPUT_1 4
 #define PIN_OUTPUT_2 26
+#define PIN_OUTPUT_3 25
+#define PIN_OUTPUT_4 27
 
 // Float/reed inputs. Keep the original float wiring.
 #define PIN_FLOAT_1 13
