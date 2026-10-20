@@ -154,7 +154,7 @@ void EdgeNetwork::handleProvisionPage()
 <!doctype html>
 <html lang="vi">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CrabSense C115 - Cau hinh Wi-Fi</title>
+<title>CrabSense Kiosk - Cau hinh Wi-Fi</title>
 <style>
 body{font-family:Arial,sans-serif;background:#eef8f5;color:#173b4d;margin:0;padding:24px}
 main{max-width:460px;margin:auto;background:white;border-radius:18px;padding:24px;
@@ -165,7 +165,7 @@ font-size:16px}button{width:100%;padding:13px;margin-top:22px;border:0;border-ra
 background:#07866d;color:white;font-size:16px;font-weight:bold}small{color:#607d85}
 </style>
 <main>
-<h1>CrabSense-C115</h1>
+<h1>CrabSense Kiosk</h1>
 <p>Cấu hình Wi-Fi cho bộ điều khiển ESP32.</p>
 <form method="post" action="/configure">
 <label>Wi-Fi trại</label>
@@ -211,8 +211,8 @@ void EdgeNetwork::handleInfo()
     doc["deviceCode"] = deviceCode();
     doc["apName"] = apName();
     doc["controllerType"] = "ras_controller";
-    doc["firmware"] = "1.0.0";
-    doc["board"] = "ESP32 DevKit V1";
+    doc["firmware"] = FIRMWARE_VERSION;
+    doc["board"] = HARDWARE_MODEL;
     doc["mac"] = macAddress();
     doc["ipAddress"] = WiFi.localIP().toString();
     doc["staIp"] = WiFi.localIP().toString();
@@ -395,8 +395,8 @@ void EdgeNetwork::registerWithKiosk()
     doc["deviceCode"] = deviceCode();
     doc["controller_id"] = deviceCode();
     doc["mac"] = macAddress();
-    doc["firmware"] = "1.0.0";
-    doc["hardware"] = "ESP32-V1";
+    doc["firmware"] = FIRMWARE_VERSION;
+    doc["hardware"] = HARDWARE_MODEL;
     doc["ipAddress"] = WiFi.localIP().toString();
     String payload;
     serializeJson(doc, payload);
@@ -499,12 +499,21 @@ void EdgeNetwork::publishTelemetry()
 
 String EdgeNetwork::deviceCode() const
 {
-    return "CrabSense-C115";
+    // Lấy 4 hex cuối của MAC: mỗi board một mã, tránh trùng khi có nhiều kiosk.
+    String mac = WiFi.macAddress();
+    mac.replace(":", "");
+    if (mac.length() < 4)
+    {
+        return String(DEVICE_CODE_PREFIX) + "0000";
+    }
+    String suffix = mac.substring(mac.length() - 4);
+    suffix.toUpperCase();
+    return String(DEVICE_CODE_PREFIX) + suffix;
 }
 
 String EdgeNetwork::apName() const
 {
-    return "CrabSense-C115";
+    return deviceCode();
 }
 
 String EdgeNetwork::macAddress() const

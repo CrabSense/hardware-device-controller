@@ -21,4 +21,10 @@
 #define RS485_POLL_INTERVAL_MS 2000
 #define RS485_SLAVE_ADDR 2
 
+// Định danh firmware/board báo lên BE. Không hardcode trong code logic.
+#define FIRMWARE_VERSION "1.0.0"
+#define HARDWARE_MODEL "ESP32-V1"
+// Tiền tố device code; hậu tố lấy 4 ký tự cuối MAC nên mỗi board là duy nhất.
+#define DEVICE_CODE_PREFIX "CrabSense-"
+
 #endif
