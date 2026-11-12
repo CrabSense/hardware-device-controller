@@ -5,6 +5,7 @@
 #include "drivers/FloatController.h"
 #include "drivers/PowerMeter.h"
 #include "modules/CommandRouter.h"
+#include "modules/EdgeV2.h"
 #include "services/EdgeNetwork.h"
 
 EdgeNetwork edgeNetwork;
@@ -24,7 +25,8 @@ void readSerialCommands()
             if (commandBuffer.length() > 0)
             {
                 commandBuffer.trim();
-                handleSerialCommand(commandBuffer);
+                if (!edgev2fw::serial(commandBuffer))
+                    handleSerialCommand(commandBuffer);
                 commandBuffer.clear();
             }
             continue;

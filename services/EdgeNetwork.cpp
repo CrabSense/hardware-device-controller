@@ -1,4 +1,5 @@
 #include "EdgeNetwork.h"
+#include "../modules/EdgeV2.h"
 
 #include "../config/Settings.h"
 #include "../drivers/DeviceController.h"
@@ -60,6 +61,7 @@ void EdgeNetwork::begin()
     server.on("/api/status", HTTP_GET, []() { instance->handleInfo(); });
 
     connectWifi();
+    edgev2fw::begin(server);
     server.begin();
 }
 
@@ -70,10 +72,13 @@ void EdgeNetwork::loop()
         for (uint8_t i = 0; i < 20; ++i)
             dnsServer.processNextRequest();
     }
+    edgev2fw::tick(WiFi.isConnected());
     server.handleClient();
+    edgev2fw::tick(WiFi.isConnected());
 
     if (restartPending && millis() >= restartAt)
     {
+        allOutputsOff();
         ESP.restart();
     }
 
@@ -185,6 +190,7 @@ onchange="password.type=this.checked?'text':'password'"> Hiện mật khẩu</la
 
 void EdgeNetwork::handleProvisionForm()
 {
+    if (!provisioningMode || !ssid.isEmpty()) { server.send(403); return; }
     const String newSsid = server.arg("ssid");
     const String newPassword = server.arg("password");
     const String newKioskUrl = server.arg("kioskUrl");
@@ -212,6 +218,8 @@ void EdgeNetwork::handleInfo()
     doc["apName"] = apName();
     doc["controllerType"] = "ras_controller";
     doc["firmware"] = FIRMWARE_VERSION;
+    doc["edgeProtocol"] = 2;
+    doc["relayOnEnabled"] = false;
     doc["board"] = HARDWARE_MODEL;
     doc["mac"] = macAddress();
     doc["ipAddress"] = WiFi.localIP().toString();
@@ -254,14 +262,12 @@ void EdgeNetwork::handleInfo()
 
 void EdgeNetwork::handleRestart()
 {
-    server.send(200, "application/json",
-                "{\"success\":true,\"message\":\"Restart scheduled\"}");
-    restartPending = true;
-    restartAt = millis() + 500;
+    server.send(501, "application/json", "{\"success\":false,\"message\":\"Remote restart disabled\"}");
 }
 
 void EdgeNetwork::handleProvision()
 {
+    if (!provisioningMode || !ssid.isEmpty()) { server.send(403); return; }
     JsonDocument doc;
     if (deserializeJson(doc, server.arg("plain")))
     {
@@ -302,80 +308,7 @@ void EdgeNetwork::handleProvision()
 
 void EdgeNetwork::handleCommand()
 {
-    JsonDocument doc;
-    if (deserializeJson(doc, server.arg("plain")))
-    {
-        server.send(400, "application/json",
-                    "{\"success\":false,\"message\":\"Invalid JSON\"}");
-        return;
-    }
-
-    String command = String(doc["command"] | "");
-    command.toLowerCase();
-    command.trim();
-
-    int channel = 0;
-    JsonVariant channelValue = doc["channel"];
-    if (channelValue.is<int>())
-        channel = channelValue.as<int>();
-    else
-    {
-        const char *rawChannel = channelValue.as<const char *>();
-        String channelText = rawChannel ? String(rawChannel) : String("");
-        channelText.toLowerCase();
-        channelText.trim();
-        if (channelText == "1" || channelText == "ssr1" || channelText == "pump1"
-            || channelText == "pump_01" || channelText == "pump_1")
-            channel = 1;
-        else if (channelText == "2" || channelText == "ssr2" || channelText == "pump2"
-                 || channelText == "pump_02" || channelText == "pump_2")
-            channel = 2;
-        else
-            channel = channelText.toInt();
-    }
-
-    bool success = true;
-    if (command == "alloff")
-    {
-        allOutputsOff();
-    }
-    else if (command == "on" || command == "off" || command == "toggle")
-    {
-        if (channel < 1 || channel > getOutputCount())
-            success = false;
-        else
-        {
-            const bool enabled = command == "on"
-                ? true
-                : command == "off" ? false : !isOutputEnabled(channel);
-            success = setOutput(channel, enabled);
-        }
-    }
-    else if (command == "status")
-    {
-        success = true;
-    }
-    else
-    {
-        success = false;
-    }
-
-    JsonDocument response;
-    response["success"] = success;
-    response["command"] = command;
-    response["channel"] = channel;
-    for (uint8_t i = 1; i <= getOutputCount(); ++i)
-    {
-        char key[12];
-        snprintf(key, sizeof(key), "output%u", i);
-        response[key] = isOutputEnabled(i);
-    }
-    response["message"] = success ? "Applied" : "Invalid command or channel";
-    String body;
-    serializeJson(response, body);
-    server.send(success ? 200 : 400, "application/json", body);
-    Serial.print("API ");
-    Serial.println(body);
+    edgev2fw::handle(server, deviceCode());
 }
 
 void EdgeNetwork::registerWithKiosk()
@@ -396,6 +329,8 @@ void EdgeNetwork::registerWithKiosk()
     doc["controller_id"] = deviceCode();
     doc["mac"] = macAddress();
     doc["firmware"] = FIRMWARE_VERSION;
+    doc["edgeProtocol"] = 2;
+    doc["relayOnEnabled"] = false;
     doc["hardware"] = HARDWARE_MODEL;
     doc["ipAddress"] = WiFi.localIP().toString();
     String payload;

@@ -1,0 +1,11 @@
+# Edge V2 RC1 — safe-off release candidate
+
+This release is intentionally NOT a live pump controller. ON is blocked in the driver and protocol until the physical float mapping, polarity, independent electrical cutoffs and dry-run/overflow tests are verified. Never flash a live installation without isolating loads and a controlled cutover.
+
+The reference Kiosk bridge is not the deployed Kiosk. Integrate it on an isolated LAN, one process per approved device, with authenticated HTTPS to BE and per-device keys. Set CRAB_CLOUD_URL, CRAB_ESP_URL, CRAB_DEVICE_CODE, CRAB_DEVICE_KEY, CRAB_LOCAL_KEY (64 lowercase hex characters), CRAB_RELAY_CHANNELS (comma-separated registered numeric channels). Store secrets outside source control. Provision the matching local key via physical USB serial using edgekey followed by the key; this is one-time and does not reset sequence history. No cloud fleet key fallback. Synchronize ESP and Kiosk clocks.
+
+The bridge uses X-Device-Key and X-Edge-Protocol: 2, polls pending commands, validates expiry and lease, signs local command envelopes and verifies signed results including device, nonce, command ID, sequence and delivery attempt. Only then ACKs the current attempt. Relay observations are sent separately. ACK is not evidence of physical water flow.
+
+Firmware stores per-channel high-water marks in NVS before writing outputs; duplicates never re-actuate; alloff affects only eligible channels. Missing commissioned slots or write failures fail closed. Watchdog and boot switch outputs off. No toggle, remote restart or unauthenticated command endpoint. Provisioning is limited to first boot; recovery and credential rotation require a controlled service process. Existing local telemetry/registration remains separate from the reference command bridge.
+
+Run native tests, Python tests and PlatformIO build using CI. Before enabling BE EDGE_PROTOCOL_V2_READY, verify actual firmware and Kiosk deployment, authenticated telemetry, per-channel mapping, NVS persistence and power loss, replay/expiry, Wi-Fi/cloud outage, SSR safe boot, high/low floats, physical interlocks, and FE private media. No firmware flashing, live actuation or VPS deployment is performed by this repository CI.

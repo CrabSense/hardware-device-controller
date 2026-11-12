@@ -35,6 +35,7 @@ void setupDeviceController()
 
     for (uint8_t channel = 1; channel <= outputCount; ++channel)
     {
+        digitalWrite(outputPins[channel - 1], OUTPUT_INACTIVE_LEVEL);
         pinMode(outputPins[channel - 1], OUTPUT);
     }
 
@@ -53,7 +54,7 @@ void allOutputsOff()
 
 bool setOutput(uint8_t channel, bool enabled)
 {
-    if (!validChannel(channel))
+    if (enabled || !validChannel(channel))
     {
         return false;
     }
