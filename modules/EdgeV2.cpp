@@ -170,6 +170,9 @@ void handle(WebServer& server,const String& deviceCode) {
         out["id"]=id; out["deliveryAttemptId"]=attempt;
         if(id.length()!=36 || attempt.length()!=36 || !doc["commandSequence"].is<uint64_t>() || !doc["channel"].is<unsigned>()) {reject(server,400,"invalid_command_fields");return;}
         uint64_t seq=doc["commandSequence"].as<uint64_t>(); unsigned ch=doc["channel"].as<unsigned>(); out["commandSequence"]=seq;
+        if(!doc["inventoryRevision"].is<uint64_t>() || doc["inventoryRevision"].as<uint64_t>()!=manifestRevision) {
+            out["success"]=false; out["message"]="inventory_revision_mismatch"; reply(server,out,200); return;
+        }
         if(seq>INT64_MAX || (cmd!="on"&&cmd!="off"&&cmd!="alloff")) {reject(server,400,"invalid_command");return;}
         auto r=edgev2::execute(board,getOutputCount(),ch,seq,cmd=="on",cmd=="alloff");
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);

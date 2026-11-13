@@ -23,3 +23,5 @@ The signed inventory advertises remoteControl=false. Physical interlocks,
 wiring/polarity, dry-run and overflow tests are required before changing that.
 The reference Python bridge is not the production Kiosk; use the updated
 CrabSenseKiosk Edge V2 worker for signed inventory and dynamic channels.
+
+Command envelopes must carry the current inventoryRevision; a stale revision is rejected before writing GPIO. The old reference bridge does not supply this field and must not be used with RC2.
