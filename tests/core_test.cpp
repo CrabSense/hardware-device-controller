@@ -28,5 +28,9 @@ int main(){using namespace edgev2; Fake f;
  assert(execute(f,4,0,100,false,true)==Result::Applied);
  assert(execute(f,4,1,99,true,false)==Result::Stale);
  Fake g; g.seq[0]=50; g.on[0]=true; g.on[1]=true; assert(execute(g,4,0,50,false,true)==Result::Unsafe && !g.on[1] && g.on[0]);
- std::cout<<"Edge V2 native core: 15 scenarios passed\n";
+ Fake expanded; assert(execute(expanded,8,5,1,true,false)==Result::Applied && expanded.on[4]);
+ assert(execute(expanded,8,0,2,false,true)==Result::Applied && !expanded.on[4] && expanded.seq[7]==2);
+ assert(execute(expanded,8,9,3,true,false)==Result::Invalid);
+ assert(execute(expanded,MAX_OUTPUTS+1,1,3,true,false)==Result::Invalid);
+ std::cout<<"Edge V2 native core: 19 scenarios passed\n";
 }

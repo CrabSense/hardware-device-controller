@@ -113,7 +113,7 @@ class Bridge:
         if not hb['success']: raise ValueError('heartbeat rejected')
         self.discover(hb)
         self.report(hb)
-        if self.control_disabled: return
+        if self.control_disabled or hb.get("commandStorageReady") is not True: return
         commands=self.cloud_call('/api/edge/commands/pending?'+urllib.parse.urlencode({'deviceCode':self.device}))
         if not isinstance(commands,list): raise ValueError('invalid pending response')
         for c in sorted(commands,key=lambda x:x['commandSequence']):

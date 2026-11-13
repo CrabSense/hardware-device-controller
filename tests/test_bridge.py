@@ -34,7 +34,7 @@ class Tests(unittest.TestCase):
         return dict(deviceCode='ESP-A',hardwareModel='ESP32-V1',firmwareVersion='2.1',configVersion=2,
             ports=[dict(portCode=f'OUT-{i:02}',type='DIGITAL_OUTPUT',channel=i,gpio=i+3,activeLevel='HIGH',on=False) for i in range(1,n+1)])
     def heartbeat(self,n=5):
-        return dict(success=True,outputs=[dict(channel=i,on=False) for i in range(1,n+1)],capabilities=self.manifest(n))
+        return dict(success=True,commandStorageReady=True,outputs=[dict(channel=i,on=False) for i in range(1,n+1)],capabilities=self.manifest(n))
     def test_auto_discovery_channel_five_while_control_locked(self):
         b=Bridge('https://example.com','http://192.168.1.4','ESP-A','key','a'*64)
         with patch.object(b,'local_call',return_value=self.heartbeat()),patch.object(b,'cloud_call',side_effect=[dict(configVersion=2,boundOutputChannels=[],hardwareControlDisabled=True)]) as cloud:
