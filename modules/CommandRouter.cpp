@@ -24,19 +24,7 @@ void reportOutputs()
 
 void printCommandHelp()
 {
-    Serial.println();
-    Serial.println("CrabSense device controller");
-    Serial.println("Commands:");
-    Serial.println("  ON locked pending verified hardware interlocks");
-    Serial.printf("  off <1-%u>      Disable SSR\n", getOutputCount());
-    Serial.println("  alloff         Disable every output");
-    Serial.println("  status         Show output states");
-    Serial.println("  floats         Print all float states");
-    Serial.println("  meter          Poll RS485 power meter");
-    Serial.println("  quiet          Stop repeating float log");
-    Serial.println("  log            Resume repeating float log");
-    Serial.println("  help            Show this help");
-    Serial.println();
+    Serial.println("CrabSense: ON locked. Commands: off <channel>, alloff, status, floats, meter, quiet, log, help");
 }
 
 void handleSerialCommand(const String &command)
@@ -95,7 +83,7 @@ void handleSerialCommand(const String &command)
 
     if (sscanf(command.c_str(), "off %d", &channel) == 1)
     {
-        if (channel < 1 || channel > getOutputCount() || !setOutput(channel, false))
+        if (!setOutput(channel, false))
         {
             Serial.println("ERR invalid channel");
             return;

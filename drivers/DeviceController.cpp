@@ -8,18 +8,16 @@ namespace
 constexpr uint8_t outputPins[] = {
     RAS_OUTPUT_PINS};
 constexpr uint8_t outputCount = sizeof(outputPins) / sizeof(outputPins[0]);
-// ESP32 DevKit output pins: exclude flash, boot strapping, serial, input-only,
-// and all existing sensor/bus pins. Verify board-specific wiring before use.
 constexpr bool safeOutput(uint8_t p) {
-    return (p==4 || p==18 || p==19 || p==21 || p==22 || p==23 || p==25 || p==26 || p==27);
+    return p==4 || p==18 || p==19 || p==21 || p==22 || p==23 || p==25 || p==26 || p==27;
 }
-constexpr bool uniqueFrom(unsigned i, unsigned j) {
-    return j>=outputCount ? true : (outputPins[i]!=outputPins[j] && uniqueFrom(i,j+1));
+constexpr bool uniqueFrom(unsigned i,unsigned j) {
+    return j>=outputCount ? true : outputPins[i]!=outputPins[j] && uniqueFrom(i,j+1);
 }
 constexpr bool validOutputs(unsigned i) {
-    return i>=outputCount ? true : (safeOutput(outputPins[i]) && uniqueFrom(i,i+1) && validOutputs(i+1));
+    return i>=outputCount ? true : safeOutput(outputPins[i]) && uniqueFrom(i,i+1) && validOutputs(i+1);
 }
-static_assert(outputCount>0 && outputCount<=16 && validOutputs(0), "Invalid or duplicate RAS GPIO");
+static_assert(outputCount>0 && outputCount<=32 && validOutputs(0), "Invalid or duplicate RAS GPIO");
 
 bool outputState[outputCount] = {};
 

@@ -1,9 +1,7 @@
 #include "EdgeV2.h"
 #include "EdgeV2Core.h"
+#include "CapabilityManifest.h"
 #include "../drivers/DeviceController.h"
-#include "../drivers/FloatController.h"
-#include "../config/Pins.h"
-#include "../config/Settings.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <mbedtls/md.h>
@@ -13,9 +11,9 @@ namespace {
 Preferences nvs;
 String key;
 bool storageOk = false;
-uint64_t marks[edgev2::MaxOutputs] = {};
-uint64_t manifestRevision = 0;
-String manifestJson;
+bool capabilityOk = false;
+bool authenticated = false;
+uint64_t marks[edgev2::MAX_OUTPUTS] = {};
 unsigned long heartbeatAt = 0;
 bool heartbeatValid = false;
 uint64_t lastHeartbeatEpoch = 0;
@@ -41,52 +39,10 @@ bool validKey(const String& s) {
     return true;
 }
 String slot(unsigned ch) { return String("seq")+ch; }
-bool prepareManifest() {
-    JsonDocument doc;
-    doc["hardwareModel"]=HARDWARE_MODEL;
-    doc["firmwareVersion"]=FIRMWARE_VERSION;
-    JsonArray ports = doc["ports"].to<JsonArray>();
-    for (unsigned ch=1; ch<=getOutputCount(); ++ch) {
-        JsonObject p=ports.add<JsonObject>();
-        char id[12]; snprintf(id,sizeof(id),"OUT-%02u",ch);
-        p["portId"]=id; p["channel"]=String(ch); p["gpio"]=getOutputPin(ch-1);
-        p["activeLevel"]="HIGH";
-        p["kind"]="ssr"; p["direction"]="output"; p["discovery"]="declared";
-        p["present"]=true; p["remoteControl"]=false; // ON stays physically locked
-    }
-    for (unsigned i=0;i<getFloatCount();++i) {
-        JsonObject p=ports.add<JsonObject>();
-        char id[12]; snprintf(id,sizeof(id),"IN-%02u",i+1);
-        p["portId"]=id; p["channel"]=String(i+1); p["gpio"]=getFloatPin(i);
-        p["sensorCode"]=getFloatSensorCode(i); p["activeLevel"]="LOW";
-        p["kind"]="float"; p["direction"]="input"; p["discovery"]="declared";
-        p["present"]=true; p["remoteControl"]=false;
-    }
-    JsonObject meter=ports.add<JsonObject>();
-    meter["portId"]="RS485-01"; meter["kind"]="rs485"; meter["direction"]="bidirectional";
-    meter["gpio"]=PIN_RS485_RX; meter["secondaryGpio"]=PIN_RS485_TX;
-    meter["discovery"]="declared"; meter["present"]=true; meter["remoteControl"]=false;
-    String descriptor=String(HARDWARE_MODEL)+"|"; serializeJson(ports,descriptor);
-    String old=nvs.getString("manifest","");
-    int sep=old.indexOf('|');
-    uint64_t rev=1;
-    if(sep>0) {
-        rev=strtoull(old.substring(0,sep).c_str(),nullptr,10);
-        if(!rev || rev>=INT32_MAX) return false;
-        if(old.substring(sep+1)!=descriptor) ++rev;
-    } else if(!old.isEmpty()) return false;
-    char number[24]; snprintf(number,sizeof(number),"%llu",(unsigned long long)rev);
-    String next=String(number)+"|"+descriptor;
-    if(next!=old && nvs.putString("manifest",next)!=next.length()) return false;
-    doc["schemaVersion"]=1; doc["revision"]=rev;
-    manifestJson=""; serializeJson(doc,manifestJson);
-    manifestRevision=rev;
-    return true;
-}
 struct BoardIO : edgev2::IO {
     uint64_t high(unsigned ch) override { return marks[ch-1]; }
     bool persist(unsigned ch, uint64_t seq) override {
-        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) return false;
+        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) { storageOk=false; return false; }
         marks[ch-1]=seq; return true;
     }
     bool state(unsigned ch) override { return isOutputEnabled(ch); }
@@ -102,16 +58,17 @@ void reject(WebServer& server,int code,const char* reason) { JsonDocument d; d["
 }
 namespace edgev2fw {
 void begin(WebServer& server) {
-    allOutputsOff(); storageOk=nvs.begin("edgev2",false);
+    allOutputsOff(); storageOk=getOutputCount()>0 && getOutputCount()<=edgev2::MAX_OUTPUTS && nvs.begin("edgev2",false);
     if(storageOk) {
         key=nvs.getString("key","");
         bool commissioned=nvs.getBool("commissioned",false);
+        authenticated=commissioned && validKey(key);
+        capabilityOk=initializeCapabilityManifest(nvs);
         const unsigned count=getOutputCount();
-        if(!count || count>edgev2::MaxOutputs) storageOk=false;
-        // RC1 commissioned exactly four slots. Never recreate a missing old
-        // slot or accept a downgrade. Expansion initializes only new slots.
+        // The legacy deployed profile has four sequence slots. On append-only
+        // expansion never recreate a missing old slot or reset its sequence.
         unsigned previous=commissioned ? nvs.getUInt("slotCount",4) : 0;
-        if(previous>count || previous>edgev2::MaxOutputs || (commissioned && !previous)) storageOk=false;
+        if(previous>count || previous>edgev2::MAX_OUTPUTS || (commissioned && !previous)) storageOk=false;
         uint64_t floor=0;
         if(storageOk) for(unsigned i=1;i<=previous;++i) {
             if(!nvs.isKey(slot(i).c_str())) {storageOk=false;break;}
@@ -123,15 +80,13 @@ void begin(WebServer& server) {
             for(unsigned i=previous+1;i<=count;++i) {
                 const String name=slot(i);
                 uint64_t value=nvs.getULong64(name.c_str(),floor);
-                if(value<floor || value>INT64_MAX ||
-                   nvs.putULong64(name.c_str(),value)!=sizeof(uint64_t) ||
-                   nvs.getULong64(name.c_str(),UINT64_MAX)!=value) {storageOk=false;break;}
+                if(value<floor || value>INT64_MAX || nvs.putULong64(name.c_str(),value)!=sizeof(uint64_t)
+                    || nvs.getULong64(name.c_str(),UINT64_MAX)!=value) {storageOk=false;break;}
                 marks[i-1]=value;
             }
             if(storageOk && previous!=count && nvs.putUInt("slotCount",count)!=sizeof(uint32_t)) storageOk=false;
         }
         if(!commissioned && !key.isEmpty()) storageOk=false;
-        if(storageOk && !prepareManifest()) storageOk=false;
     }
     const char* headers[]={"X-Kiosk-Signature"}; server.collectHeaders(headers,1);
     configTime(0,0,"pool.ntp.org","time.nist.gov");
@@ -146,13 +101,13 @@ bool serial(const String& line) {
     if(!line.startsWith("edgekey ")) return false;
     allOutputsOff(); heartbeatValid=false;
     String candidate=line.substring(8); candidate.trim();
-    if(!storageOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
+    if(!storageOk || !capabilityOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
     for(unsigned ch=1;ch<=getOutputCount();++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
     if(nvs.putUInt("slotCount",getOutputCount())!=sizeof(uint32_t) || !nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
-    key=candidate; Serial.println("OK edge key provisioned; ON remains locked"); return true;
+    key=candidate; authenticated=true; capabilityOk=initializeCapabilityManifest(nvs); Serial.println("OK edge key provisioned; ON remains locked"); return true;
 }
 void handle(WebServer& server,const String& deviceCode) {
-    if(!storageOk || !validKey(key)) { reject(server,503,"not_commissioned"); return; }
+    if(!authenticated || !capabilityOk || !validKey(key)) { reject(server,503,"not_commissioned"); return; }
     String body=server.arg("plain");
     if(body.length()>2048 || !same(signature(body),server.header("X-Kiosk-Signature"))) { reject(server,401,"invalid_signature"); return; }
     JsonDocument doc;
@@ -168,17 +123,13 @@ void handle(WebServer& server,const String& deviceCode) {
     if(kind=="heartbeat") {
         if(expires-now<=5 && expires>lastHeartbeatEpoch) {lastHeartbeatEpoch=expires; heartbeatAt=millis(); heartbeatValid=true; success=true; result="heartbeat";}
         else result="stale_heartbeat";
-    } else if(kind=="inventory") {
-        JsonDocument manifest;
-        if(!manifestRevision || deserializeJson(manifest,manifestJson)) {reject(server,503,"inventory_unavailable");return;}
-        out["manifest"].set(manifest.as<JsonObjectConst>());
-        success=true; result="inventory";
     } else if(kind=="command") {
+        if(!storageOk) {reject(server,503,"sequence_storage_not_verified");return;}
         String id=doc["id"]|"", attempt=doc["deliveryAttemptId"]|"", cmd=doc["command"]|"";
         out["id"]=id; out["deliveryAttemptId"]=attempt;
         if(id.length()!=36 || attempt.length()!=36 || !doc["commandSequence"].is<uint64_t>() || !doc["channel"].is<unsigned>()) {reject(server,400,"invalid_command_fields");return;}
         uint64_t seq=doc["commandSequence"].as<uint64_t>(); unsigned ch=doc["channel"].as<unsigned>(); out["commandSequence"]=seq;
-        if(!doc["inventoryRevision"].is<uint64_t>() || doc["inventoryRevision"].as<uint64_t>()!=manifestRevision) {
+        if(!doc["inventoryRevision"].is<uint32_t>() || doc["inventoryRevision"].as<uint32_t>()!=capabilityRecord.version) {
             out["success"]=false; out["message"]="inventory_revision_mismatch"; reply(server,out,200); return;
         }
         if(seq>INT64_MAX || (cmd!="on"&&cmd!="off"&&cmd!="alloff")) {reject(server,400,"invalid_command");return;}
@@ -186,6 +137,7 @@ void handle(WebServer& server,const String& deviceCode) {
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);
     }
     out["success"]=success; out["message"]=result;
+    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; }
     JsonArray states=out["outputs"].to<JsonArray>(); for(unsigned i=1;i<=getOutputCount();++i) {auto item=states.add<JsonObject>();item["channel"]=i;item["on"]=isOutputEnabled(i);}
     reply(server,out,200);
 }
