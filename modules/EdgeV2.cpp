@@ -3,6 +3,7 @@
 #include "../drivers/DeviceController.h"
 #include "../drivers/FloatController.h"
 #include "../config/Pins.h"
+#include "../config/Settings.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <mbedtls/md.h>
@@ -42,29 +43,36 @@ bool validKey(const String& s) {
 String slot(unsigned ch) { return String("seq")+ch; }
 bool prepareManifest() {
     JsonDocument doc;
+    doc["hardwareModel"]=HARDWARE_MODEL;
+    doc["firmwareVersion"]=FIRMWARE_VERSION;
     JsonArray ports = doc["ports"].to<JsonArray>();
     for (unsigned ch=1; ch<=getOutputCount(); ++ch) {
         JsonObject p=ports.add<JsonObject>();
-        p["portId"]=String("ssr-")+ch; p["channel"]=String(ch); p["gpio"]=getOutputPin(ch-1);
+        char id[12]; snprintf(id,sizeof(id),"OUT-%02u",ch);
+        p["portId"]=id; p["channel"]=String(ch); p["gpio"]=getOutputPin(ch-1);
+        p["activeLevel"]="HIGH";
         p["kind"]="ssr"; p["direction"]="output"; p["discovery"]="declared";
         p["present"]=true; p["remoteControl"]=false; // ON stays physically locked
     }
     for (unsigned i=0;i<getFloatCount();++i) {
         JsonObject p=ports.add<JsonObject>();
-        p["portId"]=getFloatSensorCode(i); p["gpio"]=getFloatPin(i);
+        char id[12]; snprintf(id,sizeof(id),"IN-%02u",i+1);
+        p["portId"]=id; p["channel"]=String(i+1); p["gpio"]=getFloatPin(i);
+        p["sensorCode"]=getFloatSensorCode(i); p["activeLevel"]="LOW";
         p["kind"]="float"; p["direction"]="input"; p["discovery"]="declared";
         p["present"]=true; p["remoteControl"]=false;
     }
     JsonObject meter=ports.add<JsonObject>();
-    meter["portId"]="rs485-meter"; meter["kind"]="rs485"; meter["direction"]="bidirectional";
+    meter["portId"]="RS485-01"; meter["kind"]="rs485"; meter["direction"]="bidirectional";
+    meter["gpio"]=PIN_RS485_RX; meter["secondaryGpio"]=PIN_RS485_TX;
     meter["discovery"]="declared"; meter["present"]=true; meter["remoteControl"]=false;
-    String descriptor; serializeJson(ports,descriptor);
+    String descriptor=String(HARDWARE_MODEL)+"|"; serializeJson(ports,descriptor);
     String old=nvs.getString("manifest","");
     int sep=old.indexOf('|');
     uint64_t rev=1;
     if(sep>0) {
         rev=strtoull(old.substring(0,sep).c_str(),nullptr,10);
-        if(!rev || rev>=INT64_MAX) return false;
+        if(!rev || rev>=INT32_MAX) return false;
         if(old.substring(sep+1)!=descriptor) ++rev;
     } else if(!old.isEmpty()) return false;
     char number[24]; snprintf(number,sizeof(number),"%llu",(unsigned long long)rev);

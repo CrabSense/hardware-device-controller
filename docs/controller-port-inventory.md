@@ -28,3 +28,5 @@ Command envelopes must carry the current inventoryRevision; a stale revision is 
 
 ## Flash layout
 RC2 exceeds the old 1.25 MiB app partition. PlatformIO uses min_spiffs.csv for the 4 MB ESP32 DevKit (two larger app slots, smaller SPIFFS). Verify actual flash capacity. This changes app partition offsets: upgrade existing units by a controlled wired flash with loads isolated, preserving NVS and validating credential/sequence recovery. Do not OTA-upgrade across partition tables or erase flash. No SPIFFS data is used by this firmware, but verify any deployed custom data before migration.
+
+Canonical BE discovery codes: OUT-01… for SSR outputs, IN-01… for floats, RS485-01 for the configured bus. Signed inventory also includes hardware model, firmware version, active level, input sensor code and both bus pins. Kiosk translates this into the existing POST /api/iot/controllers/capabilities contract. Revision is limited to positive int32 to match BE configVersion.
