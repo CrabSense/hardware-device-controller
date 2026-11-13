@@ -98,12 +98,31 @@ void begin(WebServer& server) {
     if(storageOk) {
         key=nvs.getString("key","");
         bool commissioned=nvs.getBool("commissioned",false);
-        for(unsigned i=1;i<=getOutputCount();++i) {
-            if(commissioned && !nvs.isKey(slot(i).c_str())) storageOk=false;
-            marks[i-1]=nvs.getULong64(slot(i).c_str(),0);
+        const unsigned count=getOutputCount();
+        if(!count || count>edgev2::MaxOutputs) storageOk=false;
+        // RC1 commissioned exactly four slots. Never recreate a missing old
+        // slot or accept a downgrade. Expansion initializes only new slots.
+        unsigned previous=commissioned ? nvs.getUInt("slotCount",4) : 0;
+        if(previous>count || previous>edgev2::MaxOutputs || (commissioned && !previous)) storageOk=false;
+        uint64_t floor=0;
+        if(storageOk) for(unsigned i=1;i<=previous;++i) {
+            if(!nvs.isKey(slot(i).c_str())) {storageOk=false;break;}
+            marks[i-1]=nvs.getULong64(slot(i).c_str(),UINT64_MAX);
+            if(marks[i-1]>INT64_MAX) {storageOk=false;break;}
+            if(marks[i-1]>floor) floor=marks[i-1];
+        }
+        if(storageOk && commissioned) {
+            for(unsigned i=previous+1;i<=count;++i) {
+                const String name=slot(i);
+                uint64_t value=nvs.getULong64(name.c_str(),floor);
+                if(value<floor || value>INT64_MAX ||
+                   nvs.putULong64(name.c_str(),value)!=sizeof(uint64_t) ||
+                   nvs.getULong64(name.c_str(),UINT64_MAX)!=value) {storageOk=false;break;}
+                marks[i-1]=value;
+            }
+            if(storageOk && previous!=count && nvs.putUInt("slotCount",count)!=sizeof(uint32_t)) storageOk=false;
         }
         if(!commissioned && !key.isEmpty()) storageOk=false;
-        if(getOutputCount()==0 || getOutputCount()>edgev2::MaxOutputs) storageOk=false;
         if(storageOk && !prepareManifest()) storageOk=false;
     }
     const char* headers[]={"X-Kiosk-Signature"}; server.collectHeaders(headers,1);
@@ -121,7 +140,7 @@ bool serial(const String& line) {
     String candidate=line.substring(8); candidate.trim();
     if(!storageOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
     for(unsigned ch=1;ch<=getOutputCount();++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
-    if(!nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
+    if(nvs.putUInt("slotCount",getOutputCount())!=sizeof(uint32_t) || !nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
     key=candidate; Serial.println("OK edge key provisioned; ON remains locked"); return true;
 }
 void handle(WebServer& server,const String& deviceCode) {

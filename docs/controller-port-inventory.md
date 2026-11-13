@@ -12,10 +12,11 @@ monotonic revision across restarts. No GPIO scanning or test actuation.
  
 To expand a board, append a verified GPIO to RAS_OUTPUT_PINS in config/Pins.h
 and preserve existing channel numbering. Core supports up to 16 outputs.
-Existing commissioned boards missing a sequence slot fail closed. A controlled
-service procedure must provision new slots without resetting existing sequence
-history; do not erase NVS or automatically initialize missing slots on an
-already commissioned board. A new board provisions all configured slots.
+Existing commissioned boards missing an old sequence slot fail closed. An
+append-only firmware expansion initializes only new slots at the previous
+maximum sequence; stores the count last; and refuses downgrade. Never erase
+NVS or renumber existing channels. A new board provisions all configured slots.
+Verify safe GPIO assignment and power-loss recovery before flashing.
  
 ON remains locked at both firmware layers, as required by EDGE-V2.md.
 The signed inventory advertises remoteControl=false. Physical interlocks,
