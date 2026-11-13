@@ -5,7 +5,7 @@ from bridge import Bridge, command_envelope, sign, channel
 
 def command(**kw):
     now=dt.datetime.now(dt.timezone.utc)
-    data=dict(deviceCode='ESP-A',status='delivered',command='off',channel='1',commandSequence=2**53+9,id=str(uuid.uuid4()),deliveryAttemptId=str(uuid.uuid4()),expiresAt=(now+dt.timedelta(seconds=30)).isoformat(),leaseExpiresAt=(now+dt.timedelta(seconds=15)).isoformat());data.update(kw);return data
+    data=dict(deviceCode='ESP-A',status='delivered',command='off',channel='1',commandSequence=2**53+9,inventoryRevision=2,id=str(uuid.uuid4()),deliveryAttemptId=str(uuid.uuid4()),expiresAt=(now+dt.timedelta(seconds=30)).isoformat(),leaseExpiresAt=(now+dt.timedelta(seconds=15)).isoformat());data.update(kw);return data
 class Tests(unittest.TestCase):
     def test_sequence_exact(self):
         c=command();e=command_envelope(c,'ESP-A',int(time.time()));self.assertEqual(e['commandSequence'],c['commandSequence']);self.assertEqual(e['deliveryAttemptId'],c['deliveryAttemptId'])

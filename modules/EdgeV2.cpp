@@ -64,9 +64,27 @@ void begin(WebServer& server) {
         bool commissioned=nvs.getBool("commissioned",false);
         authenticated=commissioned && validKey(key);
         capabilityOk=initializeCapabilityManifest(nvs);
-        for(unsigned i=1;i<=getOutputCount();++i) {
-            if(commissioned && !nvs.isKey(slot(i).c_str())) storageOk=false;
-            marks[i-1]=nvs.getULong64(slot(i).c_str(),0);
+        const unsigned count=getOutputCount();
+        // The legacy deployed profile has four sequence slots. On append-only
+        // expansion never recreate a missing old slot or reset its sequence.
+        unsigned previous=commissioned ? nvs.getUInt("slotCount",4) : 0;
+        if(previous>count || previous>edgev2::MAX_OUTPUTS || (commissioned && !previous)) storageOk=false;
+        uint64_t floor=0;
+        if(storageOk) for(unsigned i=1;i<=previous;++i) {
+            if(!nvs.isKey(slot(i).c_str())) {storageOk=false;break;}
+            marks[i-1]=nvs.getULong64(slot(i).c_str(),UINT64_MAX);
+            if(marks[i-1]>INT64_MAX) {storageOk=false;break;}
+            if(marks[i-1]>floor) floor=marks[i-1];
+        }
+        if(storageOk && commissioned) {
+            for(unsigned i=previous+1;i<=count;++i) {
+                const String name=slot(i);
+                uint64_t value=nvs.getULong64(name.c_str(),floor);
+                if(value<floor || value>INT64_MAX || nvs.putULong64(name.c_str(),value)!=sizeof(uint64_t)
+                    || nvs.getULong64(name.c_str(),UINT64_MAX)!=value) {storageOk=false;break;}
+                marks[i-1]=value;
+            }
+            if(storageOk && previous!=count && nvs.putUInt("slotCount",count)!=sizeof(uint32_t)) storageOk=false;
         }
         if(!commissioned && !key.isEmpty()) storageOk=false;
     }
@@ -85,7 +103,7 @@ bool serial(const String& line) {
     String candidate=line.substring(8); candidate.trim();
     if(!storageOk || !capabilityOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
     for(unsigned ch=1;ch<=getOutputCount();++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
-    if(!nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
+    if(nvs.putUInt("slotCount",getOutputCount())!=sizeof(uint32_t) || !nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
     key=candidate; authenticated=true; capabilityOk=initializeCapabilityManifest(nvs); Serial.println("OK edge key provisioned; ON remains locked"); return true;
 }
 void handle(WebServer& server,const String& deviceCode) {
@@ -111,6 +129,9 @@ void handle(WebServer& server,const String& deviceCode) {
         out["id"]=id; out["deliveryAttemptId"]=attempt;
         if(id.length()!=36 || attempt.length()!=36 || !doc["commandSequence"].is<uint64_t>() || !doc["channel"].is<unsigned>()) {reject(server,400,"invalid_command_fields");return;}
         uint64_t seq=doc["commandSequence"].as<uint64_t>(); unsigned ch=doc["channel"].as<unsigned>(); out["commandSequence"]=seq;
+        if(!doc["inventoryRevision"].is<uint32_t>() || doc["inventoryRevision"].as<uint32_t>()!=capabilityRecord.version) {
+            out["success"]=false; out["message"]="inventory_revision_mismatch"; reply(server,out,200); return;
+        }
         if(seq>INT64_MAX || (cmd!="on"&&cmd!="off"&&cmd!="alloff")) {reject(server,400,"invalid_command");return;}
         auto r=edgev2::execute(board,getOutputCount(),ch,seq,cmd=="on",cmd=="alloff");
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);

@@ -39,9 +39,11 @@ def command_envelope(c, device, now):
     cmd=c['command']; seq=c['commandSequence']
     if cmd not in ('on','off','alloff') or type(seq) is not int or not 0<seq<2**63: raise ValueError('invalid sequence/command')
     for k in ('id','deliveryAttemptId'): uuid.UUID(c[k])
+    revision=c.get('inventoryRevision')
+    if type(revision) is not int or not 0<revision<2**31: raise ValueError('invalid inventory revision')
     deadline=min(epoch(c['expiresAt']),epoch(c['leaseExpiresAt']),now+10)
     if deadline<=now: raise ValueError('expired lease')
-    return dict(protocol=2,kind='command',deviceCode=device,nonce=str(uuid.uuid4()),id=c['id'],deliveryAttemptId=c['deliveryAttemptId'],commandSequence=seq,command=cmd,channel=channel(c['channel'],cmd),expiresEpoch=deadline)
+    return dict(protocol=2,kind='command',deviceCode=device,nonce=str(uuid.uuid4()),id=c['id'],deliveryAttemptId=c['deliveryAttemptId'],commandSequence=seq,command=cmd,channel=channel(c['channel'],cmd),inventoryRevision=revision,expiresEpoch=deadline)
 
 def request(url, headers, data=None):
     req=urllib.request.Request(url,data=data,headers=headers,method='GET' if data is None else 'POST')
@@ -118,7 +120,9 @@ class Bridge:
         if not isinstance(commands,list): raise ValueError('invalid pending response')
         for c in sorted(commands,key=lambda x:x['commandSequence']):
             env=command_envelope(c,self.device,int(time.time()))
-            if env['channel'] and env['channel'] not in self.channels: raise ValueError('unconfigured channel')
+            if env['inventoryRevision']!=self.manifest_version or (env['channel'] and env['channel'] not in (self.channels if env['command']=='on' else self.reported_channels)):
+                self.cloud_call('/api/edge/commands/'+env['id']+'/ack',dict(status='failed',deliveryAttemptId=env['deliveryAttemptId'],message='inventory mismatch'))
+                continue
             out=self.local_call(env)
             self.cloud_call('/api/edge/commands/'+env['id']+'/ack',dict(status='acknowledged' if out['success'] else 'failed',deliveryAttemptId=env['deliveryAttemptId'],message=out['message']))
             self.report(out)

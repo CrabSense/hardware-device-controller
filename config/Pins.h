@@ -10,6 +10,8 @@
 #define PIN_OUTPUT_2 26
 #define PIN_OUTPUT_3 25
 #define PIN_OUTPUT_4 27
+// Append only verified GPIOs; preserve existing channel numbering.
+#define RAS_OUTPUT_PINS PIN_OUTPUT_1, PIN_OUTPUT_2, PIN_OUTPUT_3, PIN_OUTPUT_4
 
 // Float/reed inputs. Keep the original float wiring.
 #define PIN_FLOAT_1 13
