@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 namespace edgev2 {
+constexpr unsigned MAX_OUTPUTS = 32;
 enum class Result { Applied, Duplicate, Stale, Unsafe, StorageFailure, Invalid };
 inline const char* message(Result r) {
     switch(r) {
@@ -18,7 +19,7 @@ struct IO {
     virtual ~IO() = default;
 };
 inline Result execute(IO& io, unsigned count, unsigned ch, uint64_t seq, bool on, bool alloff) {
-    if (!seq || !count || count > 4 || (!alloff && (ch < 1 || ch > count)) || (alloff && (on || ch))) return Result::Invalid;
+    if (!seq || !count || count > MAX_OUTPUTS || (!alloff && (ch < 1 || ch > count)) || (alloff && (on || ch))) return Result::Invalid;
     unsigned first = alloff ? 1 : ch, last = alloff ? count : ch;
     bool applied = false, duplicate = false, mismatch = false;
     for (unsigned i = first; i <= last; ++i) {

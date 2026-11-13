@@ -2,7 +2,7 @@
 #include <cassert>
 #include <iostream>
 struct Fake : edgev2::IO {
- uint64_t seq[4]={}; bool on[4]={}; bool fail=false, allow=true; int writes=0, persistCount=0;
+ uint64_t seq[edgev2::MAX_OUTPUTS]={}; bool on[edgev2::MAX_OUTPUTS]={}; bool fail=false, allow=true; int writes=0, persistCount=0;
  uint64_t high(unsigned ch) override {return seq[ch-1];}
  bool persist(unsigned ch,uint64_t s) override {if(fail)return false;seq[ch-1]=s;++persistCount;return true;}
  bool state(unsigned ch) override {return on[ch-1];}

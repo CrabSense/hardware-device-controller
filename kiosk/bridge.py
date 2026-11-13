@@ -29,9 +29,9 @@ def channel(value, command):
     if command == 'alloff':
         if value not in (None, ''): raise ValueError('alloff channel must be null')
         return 0
-    aliases = {str(i): i for i in range(1,5)}
+    aliases = {str(i): i for i in range(1,33)}
     for prefix in ('ssr','pump','pump_0','pump_'):
-        aliases.update({f'{prefix}{i}':i for i in range(1,5)})
+        aliases.update({f'{prefix}{i}':i for i in range(1,33)})
     return aliases[str(value).lower().strip()]
 
 def command_envelope(c, device, now):
@@ -51,7 +51,7 @@ def request(url, headers, data=None):
         return raw,resp.headers
 
 class Bridge:
-    def __init__(self, cloud, local, device, device_key, local_key, channels=(1,2,3,4)):
+    def __init__(self, cloud, local, device, device_key, local_key, channels=None):
         u=urllib.parse.urlsplit(cloud)
         if u.scheme!='https' or not u.hostname or u.username or u.password or u.query or u.fragment: raise ValueError('HTTPS cloud required')
         l=urllib.parse.urlsplit(local)
@@ -59,8 +59,11 @@ class Bridge:
         ip=ipaddress.ip_address(l.hostname)
         if not ip.is_private or ip.is_loopback or ip.is_unspecified or ip.is_link_local: raise ValueError('isolated LAN IP required')
         if len(local_key)!=64 or any(c not in '0123456789abcdef' for c in local_key) or not device_key: raise ValueError('invalid keys')
-        self.channels=frozenset(channels)
-        if not self.channels or not self.channels <= {1,2,3,4}: raise ValueError('invalid configured channels')
+        self.channels=frozenset()
+        self.reported_channels=frozenset()
+        self.control_disabled=True
+        self.manifest_version=None
+        # Legacy argument is accepted for callers but never trusted as capability.
         self.cloud=cloud.rstrip('/'); self.local=local.rstrip('/'); self.device=device; self.key=local_key
         self.headers={'X-Device-Key':device_key,'X-Edge-Protocol':'2','Content-Type':'application/json'}
     def cloud_call(self,path,data=None):
@@ -82,16 +85,37 @@ class Bridge:
         return out
     def report(self,out):
         states=out.get('outputs')
-        if not isinstance(states,list) or len(states)!=4: raise ValueError('missing relay observations')
-        if {s.get('channel') for s in states}!={1,2,3,4} or any(type(s.get('on')) is not bool for s in states): raise ValueError('invalid observations')
+        if not isinstance(states,list) or len(states)!=len(self.reported_channels): raise ValueError('missing relay observations')
+        if {s.get('channel') for s in states}!=self.reported_channels or any(type(s.get('on')) is not bool for s in states): raise ValueError('invalid observations')
         for s in states:
             if s['channel'] in self.channels: self.cloud_call('/api/iot/relay-state',dict(deviceCode=self.device,channel=s['channel'],on=s['on']))
+    def discover(self,hb):
+        manifest=hb.get('capabilities')
+        if not isinstance(manifest,dict) or manifest.get('deviceCode')!=self.device: raise ValueError('missing signed capability manifest')
+        ports=manifest.get('ports')
+        if not isinstance(ports,list) or not 1<=len(ports)<=64: raise ValueError('invalid capability ports')
+        outputs=[p.get('channel') for p in ports if p.get('type')=='DIGITAL_OUTPUT']
+        if not outputs or any(type(c) is not int or not 1<=c<=32 for c in outputs) or len(set(outputs))!=len(outputs): raise ValueError('invalid output capability')
+        reported=frozenset(outputs)
+        states=hb.get('outputs')
+        if not isinstance(states,list) or len(states)!=len(reported) or {s.get('channel') for s in states}!=reported:
+            raise ValueError('capability/state mismatch')
+        result=self.cloud_call('/api/iot/controllers/capabilities',manifest)
+        if not isinstance(result,dict) or result.get('configVersion')!=manifest.get('configVersion'): raise ValueError('manifest not accepted')
+        bound=result.get('boundOutputChannels')
+        if not isinstance(bound,list) or any(type(c) is not int for c in bound) or not set(bound)<=reported: raise ValueError('invalid binding')
+        self.reported_channels=reported
+        self.channels=frozenset(bound)
+        self.control_disabled=result.get('hardwareControlDisabled') is not False
+        self.manifest_version=manifest['configVersion']
     def cycle(self):
-        commands=self.cloud_call('/api/edge/commands/pending?'+urllib.parse.urlencode({'deviceCode':self.device}))
-        if not isinstance(commands,list): raise ValueError('invalid pending response')
         hb=self.local_call(dict(protocol=2,kind='heartbeat',deviceCode=self.device,nonce=str(uuid.uuid4()),expiresEpoch=int(time.time())+5))
         if not hb['success']: raise ValueError('heartbeat rejected')
+        self.discover(hb)
         self.report(hb)
+        if self.control_disabled: return
+        commands=self.cloud_call('/api/edge/commands/pending?'+urllib.parse.urlencode({'deviceCode':self.device}))
+        if not isinstance(commands,list): raise ValueError('invalid pending response')
         for c in sorted(commands,key=lambda x:x['commandSequence']):
             env=command_envelope(c,self.device,int(time.time()))
             if env['channel'] and env['channel'] not in self.channels: raise ValueError('unconfigured channel')
@@ -100,7 +124,7 @@ class Bridge:
             self.report(out)
 
 def main():
-    bridge=Bridge(*(os.environ[k] for k in ('CRAB_CLOUD_URL','CRAB_ESP_URL','CRAB_DEVICE_CODE','CRAB_DEVICE_KEY','CRAB_LOCAL_KEY')), channels=tuple(int(x) for x in os.environ['CRAB_RELAY_CHANNELS'].split(',')))
+    bridge=Bridge(*(os.environ[k] for k in ('CRAB_CLOUD_URL','CRAB_ESP_URL','CRAB_DEVICE_CODE','CRAB_DEVICE_KEY','CRAB_LOCAL_KEY')))
     while True:
         try: bridge.cycle()
         except Exception as exc: print('Edge cycle failed:',type(exc).__name__,flush=True)
