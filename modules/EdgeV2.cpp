@@ -1,5 +1,6 @@
 #include "EdgeV2.h"
 #include "EdgeV2Core.h"
+#include "CapabilityManifest.h"
 #include "../drivers/DeviceController.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -10,7 +11,9 @@ namespace {
 Preferences nvs;
 String key;
 bool storageOk = false;
-uint64_t marks[4] = {};
+bool capabilityOk = false;
+bool authenticated = false;
+uint64_t marks[edgev2::MAX_OUTPUTS] = {};
 unsigned long heartbeatAt = 0;
 bool heartbeatValid = false;
 uint64_t lastHeartbeatEpoch = 0;
@@ -39,7 +42,7 @@ String slot(unsigned ch) { return String("seq")+ch; }
 struct BoardIO : edgev2::IO {
     uint64_t high(unsigned ch) override { return marks[ch-1]; }
     bool persist(unsigned ch, uint64_t seq) override {
-        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) return false;
+        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) { storageOk=false; return false; }
         marks[ch-1]=seq; return true;
     }
     bool state(unsigned ch) override { return isOutputEnabled(ch); }
@@ -55,11 +58,13 @@ void reject(WebServer& server,int code,const char* reason) { JsonDocument d; d["
 }
 namespace edgev2fw {
 void begin(WebServer& server) {
-    allOutputsOff(); storageOk=nvs.begin("edgev2",false);
+    allOutputsOff(); storageOk=getOutputCount()>0 && getOutputCount()<=edgev2::MAX_OUTPUTS && nvs.begin("edgev2",false);
     if(storageOk) {
         key=nvs.getString("key","");
         bool commissioned=nvs.getBool("commissioned",false);
-        for(unsigned i=1;i<=4;++i) {
+        authenticated=commissioned && validKey(key);
+        capabilityOk=initializeCapabilityManifest(nvs);
+        for(unsigned i=1;i<=getOutputCount();++i) {
             if(commissioned && !nvs.isKey(slot(i).c_str())) storageOk=false;
             marks[i-1]=nvs.getULong64(slot(i).c_str(),0);
         }
@@ -78,13 +83,13 @@ bool serial(const String& line) {
     if(!line.startsWith("edgekey ")) return false;
     allOutputsOff(); heartbeatValid=false;
     String candidate=line.substring(8); candidate.trim();
-    if(!storageOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
-    for(unsigned ch=1;ch<=4;++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
+    if(!storageOk || !capabilityOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
+    for(unsigned ch=1;ch<=getOutputCount();++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
     if(!nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
-    key=candidate; Serial.println("OK edge key provisioned; ON remains locked"); return true;
+    key=candidate; authenticated=true; capabilityOk=initializeCapabilityManifest(nvs); Serial.println("OK edge key provisioned; ON remains locked"); return true;
 }
 void handle(WebServer& server,const String& deviceCode) {
-    if(!storageOk || !validKey(key)) { reject(server,503,"not_commissioned"); return; }
+    if(!authenticated || !capabilityOk || !validKey(key)) { reject(server,503,"not_commissioned"); return; }
     String body=server.arg("plain");
     if(body.length()>2048 || !same(signature(body),server.header("X-Kiosk-Signature"))) { reject(server,401,"invalid_signature"); return; }
     JsonDocument doc;
@@ -101,6 +106,7 @@ void handle(WebServer& server,const String& deviceCode) {
         if(expires-now<=5 && expires>lastHeartbeatEpoch) {lastHeartbeatEpoch=expires; heartbeatAt=millis(); heartbeatValid=true; success=true; result="heartbeat";}
         else result="stale_heartbeat";
     } else if(kind=="command") {
+        if(!storageOk) {reject(server,503,"sequence_storage_not_verified");return;}
         String id=doc["id"]|"", attempt=doc["deliveryAttemptId"]|"", cmd=doc["command"]|"";
         out["id"]=id; out["deliveryAttemptId"]=attempt;
         if(id.length()!=36 || attempt.length()!=36 || !doc["commandSequence"].is<uint64_t>() || !doc["channel"].is<unsigned>()) {reject(server,400,"invalid_command_fields");return;}
@@ -110,6 +116,7 @@ void handle(WebServer& server,const String& deviceCode) {
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);
     }
     out["success"]=success; out["message"]=result;
+    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; }
     JsonArray states=out["outputs"].to<JsonArray>(); for(unsigned i=1;i<=getOutputCount();++i) {auto item=states.add<JsonObject>();item["channel"]=i;item["on"]=isOutputEnabled(i);}
     reply(server,out,200);
 }
