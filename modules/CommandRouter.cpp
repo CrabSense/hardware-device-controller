@@ -24,19 +24,7 @@ void reportOutputs()
 
 void printCommandHelp()
 {
-    Serial.println();
-    Serial.println("CrabSense device controller");
-    Serial.println("Commands:");
-    Serial.println("  ON locked pending verified hardware interlocks");
-    Serial.println("  off <1-4>      Disable SSR");
-    Serial.println("  alloff         Disable every output");
-    Serial.println("  status         Show output states");
-    Serial.println("  floats         Print all float states");
-    Serial.println("  meter          Poll RS485 power meter");
-    Serial.println("  quiet          Stop repeating float log");
-    Serial.println("  log            Resume repeating float log");
-    Serial.println("  help            Show this help");
-    Serial.println();
+    Serial.println("CrabSense: ON locked. Commands: off <channel>, alloff, status, floats, meter, quiet, log, help");
 }
 
 void handleSerialCommand(const String &command)

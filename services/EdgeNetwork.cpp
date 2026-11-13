@@ -124,8 +124,6 @@ void EdgeNetwork::connectWifi()
     WiFi.setSleep(false);
     Serial.print("ESP IP: ");
     Serial.println(WiFi.localIP());
-    Serial.print("Kiosk URL: ");
-    Serial.println(kioskUrl);
 }
 
 void EdgeNetwork::startProvisioningAp()
@@ -353,13 +351,11 @@ void EdgeNetwork::registerWithKiosk()
             {
                 controllerSecret = secret;
                 preferences.putString("controllerSecret", controllerSecret);
-                Serial.println("Controller credential saved");
             }
             const char *status = response["status"];
             if (status != nullptr)
             {
-                Serial.print("Controller status ");
-                Serial.println(status);
+                (void)status;
             }
         }
     }

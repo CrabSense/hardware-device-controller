@@ -14,14 +14,27 @@
 struct CapabilityRecord { uint32_t version; uint8_t hash[32]; };
 static CapabilityRecord capabilityRecord{};
 inline bool initializeCapabilityManifest(Preferences& nvs) {
-    String layout=String(HARDWARE_MODEL)+"|outputs:";
-    for(unsigned i=0;i<getOutputCount();++i) layout+=String(i+1)+":"+String(getOutputPin(i))+",";
-    layout+="|inputs:";
-    for(unsigned i=0;i<getFloatCount();++i) layout+=String(i+1)+":"+String(getFloatPin(i))+":"+getFloatSensorCode(i)+",";
-    layout+="|rs485:"+String(PIN_RS485_RX)+":"+String(PIN_RS485_TX)+"|levels:"+String(OUTPUT_ACTIVE_LEVEL)+":"+String(FLOAT_ACTIVE_LEVEL);
+    // Compact canonical bytes: counts, ordered pins, length-delimited input names.
+    // The HMAC authenticates the manifest; SHA-256 fingerprints the layout.
+    uint8_t layout[1024];
+    size_t used=0;
+    auto add=[&](const void* data,size_t size) {
+        if(size>sizeof(layout)-used) return false;
+        memcpy(layout+used,data,size); used+=size; return true;
+    };
+    auto byte=[&](uint8_t value) {return add(&value,1);};
+    if(!add(HARDWARE_MODEL,sizeof(HARDWARE_MODEL)) || !byte(getOutputCount())) return false;
+    for(unsigned i=0;i<getOutputCount();++i) if(!byte(getOutputPin(i))) return false;
+    if(!byte(getFloatCount())) return false;
+    for(unsigned i=0;i<getFloatCount();++i) {
+        const char* name=getFloatSensorCode(i);
+        if(!byte(getFloatPin(i)) || !add(name,strlen(name)+1)) return false;
+    }
+    const uint8_t reserved[]={PIN_RS485_RX,PIN_RS485_TX,OUTPUT_ACTIVE_LEVEL,FLOAT_ACTIVE_LEVEL};
+    if(!add(reserved,sizeof(reserved))) return false;
     uint8_t hash[32];
     const auto* md=mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if(!md || mbedtls_md(md,reinterpret_cast<const unsigned char*>(layout.c_str()),layout.length(),hash)!=0) return false;
+    if(!md || mbedtls_md(md,layout,used,hash)!=0) return false;
     CapabilityRecord stored{};
     size_t length=nvs.getBytesLength("caplayout");
     if(length!=0 && (length!=sizeof(stored) || nvs.getBytes("caplayout",&stored,sizeof(stored))!=sizeof(stored) || stored.version==0)) return false;
