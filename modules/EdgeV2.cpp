@@ -1,6 +1,8 @@
 #include "EdgeV2.h"
 #include "EdgeV2Core.h"
 #include "../drivers/DeviceController.h"
+#include "../drivers/FloatController.h"
+#include "../config/Pins.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <mbedtls/md.h>
@@ -10,7 +12,9 @@ namespace {
 Preferences nvs;
 String key;
 bool storageOk = false;
-uint64_t marks[4] = {};
+uint64_t marks[edgev2::MaxOutputs] = {};
+uint64_t manifestRevision = 0;
+String manifestJson;
 unsigned long heartbeatAt = 0;
 bool heartbeatValid = false;
 uint64_t lastHeartbeatEpoch = 0;
@@ -36,6 +40,41 @@ bool validKey(const String& s) {
     return true;
 }
 String slot(unsigned ch) { return String("seq")+ch; }
+bool prepareManifest() {
+    JsonDocument doc;
+    JsonArray ports = doc["ports"].to<JsonArray>();
+    for (unsigned ch=1; ch<=getOutputCount(); ++ch) {
+        JsonObject p=ports.add<JsonObject>();
+        p["portId"]=String("ssr-")+ch; p["channel"]=String(ch); p["gpio"]=getOutputPin(ch-1);
+        p["kind"]="ssr"; p["direction"]="output"; p["discovery"]="declared";
+        p["present"]=true; p["remoteControl"]=false; // ON stays physically locked
+    }
+    for (unsigned i=0;i<getFloatCount();++i) {
+        JsonObject p=ports.add<JsonObject>();
+        p["portId"]=getFloatSensorCode(i); p["gpio"]=getFloatPin(i);
+        p["kind"]="float"; p["direction"]="input"; p["discovery"]="declared";
+        p["present"]=true; p["remoteControl"]=false;
+    }
+    JsonObject meter=ports.add<JsonObject>();
+    meter["portId"]="rs485-meter"; meter["kind"]="rs485"; meter["direction"]="bidirectional";
+    meter["discovery"]="declared"; meter["present"]=true; meter["remoteControl"]=false;
+    String descriptor; serializeJson(ports,descriptor);
+    String old=nvs.getString("manifest","");
+    int sep=old.indexOf('|');
+    uint64_t rev=1;
+    if(sep>0) {
+        rev=strtoull(old.substring(0,sep).c_str(),nullptr,10);
+        if(!rev || rev>=INT64_MAX) return false;
+        if(old.substring(sep+1)!=descriptor) ++rev;
+    } else if(!old.isEmpty()) return false;
+    char number[24]; snprintf(number,sizeof(number),"%llu",(unsigned long long)rev);
+    String next=String(number)+"|"+descriptor;
+    if(next!=old && nvs.putString("manifest",next)!=next.length()) return false;
+    doc["schemaVersion"]=1; doc["revision"]=rev;
+    manifestJson=""; serializeJson(doc,manifestJson);
+    manifestRevision=rev;
+    return true;
+}
 struct BoardIO : edgev2::IO {
     uint64_t high(unsigned ch) override { return marks[ch-1]; }
     bool persist(unsigned ch, uint64_t seq) override {
@@ -59,11 +98,13 @@ void begin(WebServer& server) {
     if(storageOk) {
         key=nvs.getString("key","");
         bool commissioned=nvs.getBool("commissioned",false);
-        for(unsigned i=1;i<=4;++i) {
+        for(unsigned i=1;i<=getOutputCount();++i) {
             if(commissioned && !nvs.isKey(slot(i).c_str())) storageOk=false;
             marks[i-1]=nvs.getULong64(slot(i).c_str(),0);
         }
         if(!commissioned && !key.isEmpty()) storageOk=false;
+        if(getOutputCount()==0 || getOutputCount()>edgev2::MaxOutputs) storageOk=false;
+        if(storageOk && !prepareManifest()) storageOk=false;
     }
     const char* headers[]={"X-Kiosk-Signature"}; server.collectHeaders(headers,1);
     configTime(0,0,"pool.ntp.org","time.nist.gov");
@@ -79,7 +120,7 @@ bool serial(const String& line) {
     allOutputsOff(); heartbeatValid=false;
     String candidate=line.substring(8); candidate.trim();
     if(!storageOk || !validKey(candidate) || !key.isEmpty() || nvs.getBool("commissioned",false)) { Serial.println("ERR edge key provisioning denied"); return true; }
-    for(unsigned ch=1;ch<=4;++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
+    for(unsigned ch=1;ch<=getOutputCount();++ch) if(nvs.putULong64(slot(ch).c_str(),0)!=sizeof(uint64_t)) { storageOk=false; Serial.println("ERR sequence storage"); return true; }
     if(!nvs.putBool("commissioned",true) || nvs.putString("key",candidate)!=candidate.length()) {storageOk=false; Serial.println("ERR key storage"); return true;}
     key=candidate; Serial.println("OK edge key provisioned; ON remains locked"); return true;
 }
@@ -100,6 +141,11 @@ void handle(WebServer& server,const String& deviceCode) {
     if(kind=="heartbeat") {
         if(expires-now<=5 && expires>lastHeartbeatEpoch) {lastHeartbeatEpoch=expires; heartbeatAt=millis(); heartbeatValid=true; success=true; result="heartbeat";}
         else result="stale_heartbeat";
+    } else if(kind=="inventory") {
+        JsonDocument manifest;
+        if(!manifestRevision || deserializeJson(manifest,manifestJson)) {reject(server,503,"inventory_unavailable");return;}
+        out["manifest"].set(manifest.as<JsonObjectConst>());
+        success=true; result="inventory";
     } else if(kind=="command") {
         String id=doc["id"]|"", attempt=doc["deliveryAttemptId"]|"", cmd=doc["command"]|"";
         out["id"]=id; out["deliveryAttemptId"]=attempt;

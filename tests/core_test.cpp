@@ -2,7 +2,7 @@
 #include <cassert>
 #include <iostream>
 struct Fake : edgev2::IO {
- uint64_t seq[4]={}; bool on[4]={}; bool fail=false, allow=true; int writes=0, persistCount=0;
+ uint64_t seq[edgev2::MaxOutputs]={}; bool on[edgev2::MaxOutputs]={}; bool fail=false, allow=true; int writes=0, persistCount=0;
  uint64_t high(unsigned ch) override {return seq[ch-1];}
  bool persist(unsigned ch,uint64_t s) override {if(fail)return false;seq[ch-1]=s;++persistCount;return true;}
  bool state(unsigned ch) override {return on[ch-1];}
@@ -28,5 +28,8 @@ int main(){using namespace edgev2; Fake f;
  assert(execute(f,4,0,100,false,true)==Result::Applied);
  assert(execute(f,4,1,99,true,false)==Result::Stale);
  Fake g; g.seq[0]=50; g.on[0]=true; g.on[1]=true; assert(execute(g,4,0,50,false,true)==Result::Unsafe && !g.on[1] && g.on[0]);
+ Fake expanded; assert(execute(expanded,5,5,101,false,false)==Result::Applied && expanded.seq[4]==101);
+ assert(execute(expanded,5,5,100,true,false)==Result::Stale);
+ assert(execute(expanded,17,5,102,false,false)==Result::Invalid);
  std::cout<<"Edge V2 native core: 15 scenarios passed\n";
 }

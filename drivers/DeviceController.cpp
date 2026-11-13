@@ -6,10 +6,7 @@
 namespace
 {
 constexpr uint8_t outputPins[] = {
-    PIN_OUTPUT_1,
-    PIN_OUTPUT_2,
-    PIN_OUTPUT_3,
-    PIN_OUTPUT_4};
+    RAS_OUTPUT_PINS};
 constexpr uint8_t outputCount = sizeof(outputPins) / sizeof(outputPins[0]);
 
 bool outputState[outputCount] = {};

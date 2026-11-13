@@ -28,7 +28,7 @@ void printCommandHelp()
     Serial.println("CrabSense device controller");
     Serial.println("Commands:");
     Serial.println("  ON locked pending verified hardware interlocks");
-    Serial.println("  off <1-4>      Disable SSR");
+    Serial.printf("  off <1-%u>      Disable SSR\n", getOutputCount());
     Serial.println("  alloff         Disable every output");
     Serial.println("  status         Show output states");
     Serial.println("  floats         Print all float states");
@@ -95,7 +95,7 @@ void handleSerialCommand(const String &command)
 
     if (sscanf(command.c_str(), "off %d", &channel) == 1)
     {
-        if (!setOutput(channel, false))
+        if (channel < 1 || channel > getOutputCount() || !setOutput(channel, false))
         {
             Serial.println("ERR invalid channel");
             return;
