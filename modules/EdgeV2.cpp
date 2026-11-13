@@ -42,7 +42,7 @@ String slot(unsigned ch) { return String("seq")+ch; }
 struct BoardIO : edgev2::IO {
     uint64_t high(unsigned ch) override { return marks[ch-1]; }
     bool persist(unsigned ch, uint64_t seq) override {
-        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) return false;
+        if (!storageOk || nvs.putULong64(slot(ch).c_str(),seq)!=sizeof(uint64_t) || nvs.getULong64(slot(ch).c_str(),0)!=seq) { storageOk=false; return false; }
         marks[ch-1]=seq; return true;
     }
     bool state(unsigned ch) override { return isOutputEnabled(ch); }

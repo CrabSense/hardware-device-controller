@@ -1,7 +1,7 @@
 #pragma once
 #include <ArduinoJson.h>
 #include <Preferences.h>
-#include <mbedtls/sha256.h>
+#include <mbedtls/md.h>
 #include <cstring>
 #include "../config/Pins.h"
 #include "../config/Settings.h"
@@ -12,7 +12,7 @@
 // Version is derived from the actual driver layout, persisted atomically in NVS.
 // Firmware version changes alone do not invalidate an unchanged wiring layout.
 struct CapabilityRecord { uint32_t version; uint8_t hash[32]; };
-inline CapabilityRecord capabilityRecord{};
+static CapabilityRecord capabilityRecord{};
 inline bool initializeCapabilityManifest(Preferences& nvs) {
     String layout=String(HARDWARE_MODEL)+"|outputs:";
     for(unsigned i=0;i<getOutputCount();++i) layout+=String(i+1)+":"+String(getOutputPin(i))+",";
@@ -20,7 +20,8 @@ inline bool initializeCapabilityManifest(Preferences& nvs) {
     for(unsigned i=0;i<getFloatCount();++i) layout+=String(i+1)+":"+String(getFloatPin(i))+":"+getFloatSensorCode(i)+",";
     layout+="|rs485:"+String(PIN_RS485_RX)+":"+String(PIN_RS485_TX)+"|levels:"+String(OUTPUT_ACTIVE_LEVEL)+":"+String(FLOAT_ACTIVE_LEVEL);
     uint8_t hash[32];
-    if(mbedtls_sha256_ret(reinterpret_cast<const unsigned char*>(layout.c_str()),layout.length(),hash,0)!=0) return false;
+    const auto* md=mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if(!md || mbedtls_md(md,reinterpret_cast<const unsigned char*>(layout.c_str()),layout.length(),hash)!=0) return false;
     CapabilityRecord stored{};
     size_t length=nvs.getBytesLength("caplayout");
     if(length!=0 && (length!=sizeof(stored) || nvs.getBytes("caplayout",&stored,sizeof(stored))!=sizeof(stored) || stored.version==0)) return false;
