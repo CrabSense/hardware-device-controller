@@ -29,6 +29,7 @@ private:
     String password;
     String kioskUrl;
     String controllerSecret;
+    bool registrationAccepted = false;
     bool provisioningMode = false;
     bool restartPending = false;
     unsigned long restartAt = 0;
