@@ -4,6 +4,7 @@
 #include "../config/Settings.h"
 
 #include <HardwareSerial.h>
+#include <time.h>
 
 namespace
 {
@@ -12,6 +13,8 @@ unsigned long lastPollAt = 0;
 uint8_t rxBuf[64];
 size_t rxLen = 0;
 MeterReading lastReading{};
+unsigned long lastValidAt=0;
+uint64_t lastValidEpoch=0;
 
 uint16_t crc16(const uint8_t *data, size_t len)
 {
@@ -101,6 +104,8 @@ void parseIfPossible()
     {
         const uint32_t energy = regAt(9) | (static_cast<uint32_t>(regAt(10)) << 16);
         lastReading.ok = true;
+        lastValidAt=millis();
+        lastValidEpoch=static_cast<uint64_t>(time(nullptr));
         lastReading.volts = regAt(0) / 10.0f;
         lastReading.amps = regAt(1) / 1000.0f;
         lastReading.watts = regAt(3) / 10.0f;
@@ -179,6 +184,7 @@ void pollPowerMeter()
     if (now - lastPollAt < RS485_POLL_INTERVAL_MS)
         return;
     lastPollAt = now;
+    lastReading.ok=false; // A failed CRC/timeout must not reuse a successful sample.
 
     while (rs485.available() > 0)
         rs485.read();
@@ -209,8 +215,15 @@ void printPowerMeterStatus()
 
 bool latestMeter(MeterReading *out)
 {
-    if (out == nullptr || !lastReading.ok)
+    if (out == nullptr || !lastReading.ok || millis()-lastValidAt>RS485_POLL_INTERVAL_MS+1000)
         return false;
     *out = lastReading;
+    return true;
+}
+
+bool latestMeterSample(MeterReading *out,uint64_t *measuredEpoch)
+{
+    if(!measuredEpoch || lastValidEpoch<1700000000ULL || !latestMeter(out)) return false;
+    *measuredEpoch=lastValidEpoch;
     return true;
 }

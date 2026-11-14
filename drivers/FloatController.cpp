@@ -103,3 +103,14 @@ bool getFloatState(uint8_t index)
 {
     return index < inputCount && inputs[index].stableState;
 }
+
+bool readFloatSample(uint8_t index, bool* value)
+{
+    if(index>=inputCount || !value) return false;
+    pollFloatInputs();
+    const auto &input=inputs[index];
+    // Reject a transition rather than label a bouncing contact as a measurement.
+    if(readActive(input.pin)!=input.stableState || millis()-input.rawChangedAt<FLOAT_DEBOUNCE_MS) return false;
+    *value=input.stableState;
+    return true;
+}

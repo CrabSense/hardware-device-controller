@@ -2,6 +2,9 @@
 #include "EdgeV2Core.h"
 #include "CapabilityManifest.h"
 #include "../drivers/DeviceController.h"
+#include "../drivers/FloatController.h"
+#include "../drivers/PowerMeter.h"
+#include <cmath>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <mbedtls/md.h>
@@ -123,6 +126,46 @@ void handle(WebServer& server,const String& deviceCode) {
     if(kind=="heartbeat") {
         if(expires-now<=5 && expires>lastHeartbeatEpoch) {lastHeartbeatEpoch=expires; heartbeatAt=millis(); heartbeatValid=true; success=true; result="heartbeat";}
         else result="stale_heartbeat";
+    } else if(kind=="sensor-read") {
+        // Read-only command; no relay state changes or persistent sequence writes.
+        String code=doc["sensorCode"]|"", port=doc["portCode"]|"", unit=doc["unit"]|"";
+        out["sensorCode"]=code; out["portCode"]=port;
+        if(!doc["inventoryRevision"].is<uint32_t>() || doc["inventoryRevision"].as<uint32_t>()!=capabilityRecord.version) {
+            result="inventory_revision_mismatch";
+        } else {
+            float value=0; uint64_t measured=now; const char* expectedUnit=nullptr;
+            for(unsigned i=0;i<getFloatCount();++i) {
+                char portCode[16]; snprintf(portCode,sizeof(portCode),"IN-%02u",i+1);
+                if(port==portCode && code==getFloatSensorCode(i)) {
+                    bool state=false; expectedUnit="state";
+                    success=readFloatSample(i,&state); value=state?1:0;
+                    measured=static_cast<uint64_t>(time(nullptr)); break;
+                }
+            }
+            if(port=="RS485-01" && String(doc["busAddress"]|"")==String(RS485_SLAVE_ADDR)) {
+                // Only the existing AC301 driver's decoded metrics; no arbitrary Modbus register reads.
+                String metric=doc["busRegister"]|"";
+                MeterReading reading{};
+                if(metric==code && latestMeterSample(&reading,&measured)) {
+                    if(code=="meter_v"){value=reading.volts;expectedUnit="V";}
+                    else if(code=="meter_a"){value=reading.amps;expectedUnit="A";}
+                    else if(code=="meter_w"){value=reading.watts;expectedUnit="W";}
+                    else if(code=="meter_va"){value=reading.va;expectedUnit="VA";}
+                    else if(code=="meter_kwh"){value=reading.kwh;expectedUnit="kWh";}
+                    else if(code=="meter_hz"){value=reading.hertz;expectedUnit="Hz";}
+                    else if(code=="meter_pf"){value=reading.pf;expectedUnit="%";}
+                    else if(code=="meter_min"){value=reading.minutes;expectedUnit="min";}
+                    else if(code=="meter_c"){value=reading.celsius;expectedUnit="C";}
+                    success=expectedUnit!=nullptr;
+                }
+            }
+            if(!success || !expectedUnit || unit!=expectedUnit || !std::isfinite(value)) {
+                success=false;result="sensor_unavailable_or_unit_mismatch";
+            } else {
+                out["value"]=value;out["unit"]=expectedUnit;out["measuredEpoch"]=measured;
+                result="sensor_read";
+            }
+        }
     } else if(kind=="command") {
         if(!storageOk) {reject(server,503,"sequence_storage_not_verified");return;}
         String id=doc["id"]|"", attempt=doc["deliveryAttemptId"]|"", cmd=doc["command"]|"";
@@ -137,7 +180,7 @@ void handle(WebServer& server,const String& deviceCode) {
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);
     }
     out["success"]=success; out["message"]=result;
-    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; }
+    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; out["sensorReadSupported"]=true; }
     JsonArray states=out["outputs"].to<JsonArray>(); for(unsigned i=1;i<=getOutputCount();++i) {auto item=states.add<JsonObject>();item["channel"]=i;item["on"]=isOutputEnabled(i);}
     reply(server,out,200);
 }
