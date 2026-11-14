@@ -83,9 +83,15 @@ void EdgeNetwork::loop()
     }
 
     if (!WiFi.isConnected())
+    {
+        registrationAccepted = false;
         return;
+    }
 
     registerWithKiosk();
+    // Legacy telemetry is not evidence of signed Edge V2 authentication.
+    if (!registrationAccepted)
+        return;
 
     if (millis() - lastTelemetryAt < TELEMETRY_INTERVAL_MS)
         return;
@@ -314,6 +320,7 @@ void EdgeNetwork::registerWithKiosk()
     if (lastRegisterAt != 0 && millis() - lastRegisterAt < 15000)
         return;
     lastRegisterAt = millis();
+    registrationAccepted = false;
 
     String base = kioskUrl;
     base.trim();
@@ -353,10 +360,8 @@ void EdgeNetwork::registerWithKiosk()
                 preferences.putString("controllerSecret", controllerSecret);
             }
             const char *status = response["status"];
-            if (status != nullptr)
-            {
-                (void)status;
-            }
+            registrationAccepted = status != nullptr &&
+                (strcmp(status, "Approved") == 0 || strcmp(status, "Online") == 0);
         }
     }
     else
