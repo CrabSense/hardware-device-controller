@@ -41,6 +41,20 @@ class Tests(unittest.TestCase):
             b.cycle()
             self.assertEqual(b.reported_channels,frozenset(range(1,6)))
             self.assertEqual(cloud.call_count,1)
+    def test_signed_health_forwarded_without_layout_change(self):
+        b=Bridge('https://example.com','http://192.168.1.4','ESP-A','key','a'*64)
+        hb=self.heartbeat()
+        hb.update(rssiDbm=-60,freeHeapBytes=120000,uptimeSeconds=-1,sensorReadSupported=True)
+        hb['capabilities']['rssiDbm']=-99
+        with patch.object(b,'cloud_call',return_value=dict(configVersion=2,boundOutputChannels=[],hardwareControlDisabled=True)) as cloud:
+            b.discover(hb)
+            report=cloud.call_args.args[1]
+            self.assertEqual(report['ports'],hb['capabilities']['ports'])
+            self.assertEqual(report['configVersion'],2)
+            self.assertEqual(report['rssiDbm'],-60)
+            self.assertEqual(report['freeHeapBytes'],120000)
+            self.assertIs(report['sensorReadSupported'],True)
+            self.assertNotIn('uptimeSeconds',report)
     def test_no_ack_on_transport_failure(self):
         b=Bridge('https://example.com','http://192.168.1.4','ESP-A','key','a'*64)
         with patch.object(b,'cloud_call',return_value=[command()]) as cloud,patch.object(b,'local_call',side_effect=TimeoutError):

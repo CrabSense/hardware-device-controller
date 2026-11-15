@@ -18,3 +18,7 @@ Capability layout version is now automatically calculated from driver pin maps a
 
 ## Inventory-bound expansion
 The signed heartbeat remains the canonical capability source. Commands require inventoryRevision equal to the persisted layout version. Append verified pins in RAS_OUTPUT_PINS; the direct ESP32 pin whitelist prevents conflict with existing sensors, bus and reserved pins. Existing sequence slots are preserved; new slots initialize at the old maximum, count saved last; missing old slots or downgrade fail closed. Software supports 32 channels, not 32 direct GPIOs. ON remains locked. The reference bridge rejects stale inventory revisions. RC2 uses min_spiffs.csv on the 4 MB board because the previous app partition was nearly full. A partition-table change requires wired controlled flashing, preserved NVS and isolated loads; no OTA across different layouts.
+
+## Optional signed health monitoring
+
+The authenticated heartbeat reports Wi-Fi RSSI (when connected), free heap bytes and uptime seconds, alongside commandStorageReady and sensorReadSupported. Bridges forward only valid values from signed responses. These are diagnostic observations, not capability layout changes, control authorization or physical wiring confirmation. Older firmware remains compatible. No live actuation or flashing is performed by this change.

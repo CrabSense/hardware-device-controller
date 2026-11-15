@@ -9,6 +9,8 @@
 #include <Preferences.h>
 #include <mbedtls/md.h>
 #include <time.h>
+#include <WiFi.h>
+#include <esp_timer.h>
 
 namespace {
 Preferences nvs;
@@ -180,7 +182,11 @@ void handle(WebServer& server,const String& deviceCode) {
         success=r==edgev2::Result::Applied||r==edgev2::Result::Duplicate; result=edgev2::message(r);
     }
     out["success"]=success; out["message"]=result;
-    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; out["sensorReadSupported"]=true; }
+    if(kind=="heartbeat" && success) { appendCapabilityManifest(out["capabilities"].to<JsonObject>(), deviceCode); out["commandStorageReady"]=storageOk; out["sensorReadSupported"]=true;
+        // Optional signed health evidence; independent of layout and control authorization.
+        if(WiFi.status()==WL_CONNECTED) out["rssiDbm"]=WiFi.RSSI();
+        out["freeHeapBytes"]=ESP.getFreeHeap();
+        out["uptimeSeconds"]=static_cast<uint64_t>(esp_timer_get_time())/1000000ULL; }
     JsonArray states=out["outputs"].to<JsonArray>(); for(unsigned i=1;i<=getOutputCount();++i) {auto item=states.add<JsonObject>();item["channel"]=i;item["on"]=isOutputEnabled(i);}
     reply(server,out,200);
 }
