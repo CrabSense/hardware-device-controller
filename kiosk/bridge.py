@@ -102,7 +102,17 @@ class Bridge:
         states=hb.get('outputs')
         if not isinstance(states,list) or len(states)!=len(reported) or {s.get('channel') for s in states}!=reported:
             raise ValueError('capability/state mismatch')
-        result=self.cloud_call('/api/iot/controllers/capabilities',manifest)
+        # Optional evidence comes only from the authenticated heartbeat, not the layout.
+        report=dict(manifest)
+        for field in ('commandStorageReady','sensorReadSupported','rssiDbm','freeHeapBytes','uptimeSeconds'):
+            report.pop(field,None)
+            value=hb.get(field)
+            if field in ('commandStorageReady','sensorReadSupported'):
+                if type(value) is bool: report[field]=value
+            elif type(value) is int:
+                lo,hi={'rssiDbm':(-127,0),'freeHeapBytes':(0,16777216),'uptimeSeconds':(0,315360000)}[field]
+                if lo<=value<=hi: report[field]=value
+        result=self.cloud_call('/api/iot/controllers/capabilities',report)
         if not isinstance(result,dict) or result.get('configVersion')!=manifest.get('configVersion'): raise ValueError('manifest not accepted')
         bound=result.get('boundOutputChannels')
         if not isinstance(bound,list) or any(type(c) is not int for c in bound) or not set(bound)<=reported: raise ValueError('invalid binding')
